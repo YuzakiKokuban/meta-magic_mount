@@ -1,8 +1,8 @@
-id=meta-mm
+id=meta-hybrid
 metamodule=1
-name=Magic Mount MetaModule
+name=Hybrid Mount Metamodule
 version=version
 versionCode=versionCode
-author=7a72
-description=An implementation of a metamodule using Magic Mount, Based on MKSU, Template is from meta-overlay
+author=YuzakiKokuban
+description=An metamodule with both OverlayFS and Magic Mount
 updateJson=updateJson
