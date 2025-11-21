@@ -600,7 +600,7 @@ static int do_magic(const char *base, const char *wbase, Node *node,
                  strerror(errno));
             return -1;
         } else
-        	send_unmountable(target); // tell ksu about this mount
+        	if (!strstr(target, ".magic_mount/workdir/")) { send_unmountable(target); } // tell ksu about this mount
 
         (void)mount(NULL, target, NULL,
                     MS_REMOUNT | MS_BIND | MS_RDONLY, NULL);

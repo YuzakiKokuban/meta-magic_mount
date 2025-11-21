@@ -1,15 +1,16 @@
-name: build meta-mm
+name: Release
+
 on:
   push:
-    branches: [ "dev" ]
-  pull_request:
-    branches: [ "dev" ]
-  workflow_dispatch:
-  workflow_call:
+    tags:
+      - "v*.*.*"
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6
@@ -45,14 +46,25 @@ jobs:
           pnpm build
           cd ..
           bash build.sh --release
-          cd build
-          artifact_name=$(basename meta-*.zip .zip)
-          echo "ARTIFACT_NAME=$artifact_name" >> $GITHUB_ENV
-          unzip "$artifact_name".zip
-          rm "$artifact_name".zip *.json
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v5
+      - name: Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: ci-${{ env.ARTIFACT_NAME }}
-          path: build
+          draft: true
+          files: |
+            build/*.zip
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Switch to public branch and push
+        run: |
+          git fetch origin
+          git switch public
+          cat build/update.json > update.json
+          cat build/changelog.md > changelog.md
+          git add update.json changelog.md
+          git commit -m "[skip ci] Update build json files"
+          git push origin public

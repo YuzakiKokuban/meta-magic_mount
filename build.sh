@@ -4,355 +4,349 @@
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Default values
-VERSION=""
-BUILD_TYPES=()
+# Configuration
 BASE_URL="https://github.com/7a72/meta-magic_mount/releases/download"
 UPDATE_JSON_URL="https://raw.githubusercontent.com/7a72/meta-magic_mount/public/update.json"
 CHANGELOG_URL="https://raw.githubusercontent.com/7a72/meta-magic_mount/public/changelog.md"
 
-# Show usage
+# Build state
+BUILD_TYPES=()
+VERSION=""
+VERSION_FULL=""
+GIT_COMMIT=""
+TEMP_DIRS=()
+
+# Logging functions
+log_info() { echo -e "${GREEN}$*${NC}" >&2; }
+log_warn() { echo -e "${YELLOW}$*${NC}" >&2; }
+log_error() { echo -e "${RED}$*${NC}" >&2; }
+log_step() { echo -e "\n${YELLOW}[$1/$2] $3${NC}" >&2; }
+
+# Cleanup function
+cleanup() {
+    local exit_code=$?
+    
+    log_warn "Cleaning up temporary directories..."
+    
+    for dir in "${TEMP_DIRS[@]}"; do
+        if [ -d "$dir" ]; then
+            rm -rf "$dir"
+            log_info "  Removed: $dir"
+        fi
+    done
+    
+    # If script failed, show helpful message
+    if [ $exit_code -ne 0 ]; then
+        log_error "Build failed with exit code $exit_code"
+        log_warn "All temporary files have been cleaned up"
+    fi
+    
+    exit $exit_code
+}
+
+# Register trap for cleanup
+trap cleanup EXIT INT TERM
+
+# Usage
 usage() {
-    echo "Usage: $0 [--release] [--debug]"
-    echo "  --release            Build release version"
-    echo "  --debug              Build debug version"
-    echo "  (no option)          Build both release and debug versions"
-    echo ""
-    echo "Version number will be automatically obtained from git tag"
+    cat << EOF
+Usage: $0 [OPTIONS]
+
+OPTIONS:
+    --release       Build release version only
+    --debug         Build debug version only
+    -h, --help      Show this help message
+    (no option)     Build both versions
+
+Version is automatically obtained from git tags.
+
+EXAMPLES:
+    $0                      # Build both release and debug
+    $0 --release            # Build release only
+EOF
     exit 1
 }
 
-# Parse command line arguments
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --release)
-            BUILD_TYPES+=("release")
-            shift
-            ;;
-        --debug)
-            BUILD_TYPES+=("debug")
-            shift
-            ;;
-        -h|--help)
-            usage
-            ;;
-        *)
-            echo -e "${RED}Error: Unknown parameter $1${NC}"
-            usage
-            ;;
-    esac
-done
+# Parse arguments
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --release) BUILD_TYPES+=("release"); shift ;;
+            --debug) BUILD_TYPES+=("debug"); shift ;;
+            -h|--help) usage ;;
+            *) log_error "Unknown parameter: $1"; usage ;;
+        esac
+    done
+    
+    # Default to both if none specified
+    [ ${#BUILD_TYPES[@]} -eq 0 ] && BUILD_TYPES=("release" "debug")
+}
 
-# If no build type specified, build both
-if [ ${#BUILD_TYPES[@]} -eq 0 ]; then
-    BUILD_TYPES=("release" "debug")
-    echo -e "${YELLOW}No build type specified, building both release and debug versions${NC}"
-fi
-
-# Check if in git repository
-if ! git rev-parse --git-dir > /dev/null 2>&1; then
-    echo -e "${RED}Error: Not in a git repository${NC}"
-    exit 1
-fi
-
-# Check if zig is installed
-if ! command -v zig &> /dev/null; then
-    echo -e "${RED}Error: zig is not installed${NC}"
-    exit 1
-fi
-
-# Get git tag as version number
-VERSION=$(git describe --tags --exact-match 2>/dev/null)
-if [ -z "$VERSION" ]; then
-    # If current commit has no tag, try to get the nearest tag
-    VERSION=$(git describe --tags --abbrev=0 2>/dev/null)
-    if [ -z "$VERSION" ]; then
-        echo -e "${RED}Error: Unable to get git tag, please create a tag first${NC}"
-        echo -e "${YELLOW}Hint: Use 'git tag v1.0.0' to create a tag${NC}"
+# Check prerequisites
+check_prerequisites() {
+    # Check git repository
+    if ! git rev-parse --git-dir > /dev/null 2>&1; then
+        log_error "Not in a git repository"
         exit 1
-    else
-        echo -e "${YELLOW}Warning: Current commit has no tag, using nearest tag: $VERSION${NC}"
     fi
-fi
-
-# Get git short commit or branch name
-GIT_SUFFIX=""
-GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null)
-if [ -n "$GIT_COMMIT" ]; then
-    GIT_SUFFIX="$GIT_COMMIT"
-else
-    # If unable to get commit, use branch name
-    GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
-    if [ -n "$GIT_BRANCH" ]; then
-        # Clean branch name, remove special characters
-        GIT_SUFFIX=$(echo "$GIT_BRANCH" | sed 's/[^a-zA-Z0-9_-]/_/g')
-        echo -e "${YELLOW}Warning: Unable to get commit, using branch name: $GIT_BRANCH${NC}"
-    else
-        echo -e "${YELLOW}Warning: Unable to get commit and branch information${NC}"
+    
+    # Check zig
+    if ! command -v zig &> /dev/null; then
+        log_error "zig is not installed"
+        exit 1
     fi
-fi
+    
+    # Check required directories
+    for dir in template src; do
+        if [ ! -d "$dir" ]; then
+            log_error "Required directory '$dir' not found"
+            exit 1
+        fi
+    done
+}
 
-# Function to generate changelog from git commits
+# Get version information from git
+get_version_info() {
+    local describe=$(git describe --tags --long --always --dirty 2>/dev/null)
+    
+    if [ -z "$describe" ]; then
+        log_error "Failed to get git information"
+        exit 1
+    fi
+    
+    # Parse git describe output: v1.0.0-5-gabc1234-dirty
+    if [[ "$describe" =~ ^(.+)-([0-9]+)-g([0-9a-f]+)(-dirty)?$ ]]; then
+        VERSION="${BASH_REMATCH[1]}"
+        local commits="${BASH_REMATCH[2]}"
+        GIT_COMMIT="${BASH_REMATCH[3]}"
+        local dirty="${BASH_REMATCH[4]}"
+        
+        if [ "$commits" = "0" ]; then
+            VERSION_FULL="$VERSION"
+            log_info "Building release: $VERSION"
+        else
+            VERSION_FULL="${VERSION}-${commits}-g${GIT_COMMIT}"
+            log_warn "Building from $commits commit(s) after $VERSION"
+        fi
+        
+        [ -n "$dirty" ] && VERSION_FULL="${VERSION_FULL}-dirty" && log_warn "Working directory is dirty"
+    else
+        # No tags found
+        VERSION="0.0.0"
+        GIT_COMMIT="$describe"
+        VERSION_FULL="$describe"
+        log_warn "No tags found, using commit: $describe"
+    fi
+}
+
+# Generate changelog
 generate_changelog() {
-    local CHANGELOG_FILE="$1"
-    local PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null)
+    local file="build/changelog.md"
+    local prev_tag=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null)
     
-    echo -e "${YELLOW}Generating changelog...${NC}"
-    
-    # Create changelog header
-    cat > "$CHANGELOG_FILE" << EOF
+    cat > "$file" << EOF
 # Changelog
 
-## Version $VERSION ($(date +%Y-%m-%d))
+## Version $VERSION_FULL ($(date +%Y-%m-%d))
 
 ### Changes
 
 EOF
 
-    # Add commits since last tag
-    if [ -n "$PREV_TAG" ]; then
-        echo "Changes since $PREV_TAG:" >> "$CHANGELOG_FILE"
-        echo "" >> "$CHANGELOG_FILE"
-        git log --pretty=format:"- %s (%h)" "$PREV_TAG"..HEAD >> "$CHANGELOG_FILE"
+    if [ -n "$prev_tag" ]; then
+        echo "Changes since $prev_tag:" >> "$file"
+        echo "" >> "$file"
+        git log --pretty=format:"- %s (%h)" "$prev_tag"..HEAD >> "$file"
+        echo -e "\n\n---" >> "$file"
+        echo "Full Changelog: https://github.com/7a72/meta-magic_mount/compare/${prev_tag}...${VERSION}" >> "$file"
     else
-        echo "Initial release" >> "$CHANGELOG_FILE"
-        echo "" >> "$CHANGELOG_FILE"
-        git log --pretty=format:"- %s (%h)" >> "$CHANGELOG_FILE"
+        echo "Initial release" >> "$file"
+        echo "" >> "$file"
+        git log --pretty=format:"- %s (%h)" >> "$file"
     fi
-    
-    echo "" >> "$CHANGELOG_FILE"
-    echo "" >> "$CHANGELOG_FILE"
-    echo "---" >> "$CHANGELOG_FILE"
-    echo "Full Changelog: https://github.com/7a72/meta-magic_mount/compare/${PREV_TAG}...${VERSION}" >> "$CHANGELOG_FILE"
-    
-    echo -e "${GREEN}Changelog generated: $CHANGELOG_FILE${NC}"
 }
 
-# Function to generate main update JSON (for release version)
-generate_main_update_json() {
-    local OUTPUT_NAME=$1
-    local VERSION_CODE=$2
-    local JSON_FILE="build/update.json"
+# Generate update.json for release builds
+generate_update_json() {
+    local output_name=$1
+    local version_code=$2
+    local file="build/update.json"
     
-    echo -e "${YELLOW}Generating main update JSON...${NC}"
-    
-    cat > "$JSON_FILE" << EOF
+    cat > "$file" << EOF
 {
-    "versionCode": $VERSION_CODE,
+    "versionCode": $version_code,
     "version": "$VERSION",
-    "zipUrl": "$BASE_URL/$VERSION/$OUTPUT_NAME",
+    "zipUrl": "$BASE_URL/$VERSION/$output_name",
     "changelog": "$CHANGELOG_URL"
 }
 EOF
-    
-    echo -e "${GREEN}Main update JSON generated: $JSON_FILE${NC}"
 }
 
-# Function to build Rust project for all targets
+# Build binaries
 build_binaries() {
-    local BUILD_TYPE=$1
+    local build_type=$1
     
-    echo -e "\n${YELLOW}Building binaries for all targets...${NC}"
+    log_step 2 6 "Building binaries ($build_type)"
     
     cd src || return 1
+    make clean > /dev/null 2>&1
     
-    # Clean previous builds
-    make clean
-    
-    make $BUILD_TYPE VERSION="$VERSION"
+    if ! make "$build_type" VERSION="$VERSION_FULL" >&2; then
+        cd ..
+        log_error "Failed to build binaries"
+        return 1
+    fi
     
     cd ..
-    
-    echo -e "${GREEN}All binaries built successfully${NC}"
-    return 0
+    log_info "Binaries built successfully"
 }
 
-# Function to build for a specific type
-build_for_type() {
-    local BUILD_TYPE=$1
+# Configure module files
+configure_module() {
+    local build_dir=$1
+    local build_type=$2
+    local version_code=$3
     
-    echo -e "\n${GREEN}========================================${NC}"
-    echo -e "${GREEN}Building $BUILD_TYPE version${NC}"
-    echo -e "${GREEN}Version: $VERSION${NC}"
-    echo -e "${GREEN}Build Type: $BUILD_TYPE${NC}"
-    if [ -n "$GIT_COMMIT" ]; then
-        echo -e "${GREEN}Git Commit: $GIT_COMMIT${NC}"
-    elif [ -n "$GIT_SUFFIX" ]; then
-        echo -e "${GREEN}Git Branch: $GIT_SUFFIX${NC}"
-    fi
-    echo -e "${GREEN}========================================${NC}"
-
-    # Create build directory structure
-    BUILD_DIR="build/${BUILD_TYPE}_temp"
-    if [ -d "$BUILD_DIR" ]; then
-        rm -rf "$BUILD_DIR"
-    fi
-    mkdir -p "$BUILD_DIR"
-
-    # Step 1: Copy template to build directory
-    echo -e "\n${YELLOW}[1/7] Copying template to build directory...${NC}"
-    if [ ! -d "template" ]; then
-        echo -e "${RED}Error: template directory does not exist${NC}"
-        return 1
-    fi
-
-    cp -r template/* "$BUILD_DIR/"
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Error: Failed to copy template${NC}"
-        return 1
-    fi
-    echo -e "${GREEN}Template copied${NC}"
-
-    # Step 2: Build Rust binaries
-    echo -e "\n${YELLOW}[2/7] Building binaries...${NC}"
-    build_binaries "$BUILD_TYPE"
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Error: Build failed${NC}"
-        return 1
-    fi
-    echo -e "${GREEN}Build completed${NC}"
-
-    # Step 3: Modify log level in metamount.sh (in build directory)
-    echo -e "\n${YELLOW}[3/7] Modifying metamount.sh configuration...${NC}"
-    if [ ! -f "$BUILD_DIR/metamount.sh" ]; then
-        echo -e "${RED}Error: $BUILD_DIR/metamount.sh does not exist${NC}"
-        return 1
-    fi
-
-    # Step 4: Modify module.prop (in build directory)
-    echo -e "\n${YELLOW}[4/7] Modifying module.prop...${NC}"
-    if [ ! -f "$BUILD_DIR/module.prop" ]; then
-        echo -e "${RED}Error: $BUILD_DIR/module.prop does not exist${NC}"
-        return 1
-    fi
-
-    # Generate versionCode
-    VERSION_CODE=$(git rev-list --count HEAD)
-
-    # Modify version, versionCode, and updateJson
-    sed -i "s|^version=.*|version=$VERSION|" "$BUILD_DIR/module.prop"
-    sed -i "s|^versionCode=.*|versionCode=$VERSION_CODE|" "$BUILD_DIR/module.prop"
-    sed -i "s|^updateJson=.*|updateJson=$UPDATE_JSON_URL|" "$BUILD_DIR/module.prop"
+    log_step 3 6 "Configuring module files"
     
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Error: Failed to modify module.prop${NC}"
+    # Configure module.prop
+    local module_prop="$build_dir/module.prop"
+    if [ ! -f "$module_prop" ]; then
+        log_error "module.prop not found"
         return 1
     fi
-    echo -e "${GREEN}module.prop configuration completed${NC}"
-    echo -e "${GREEN}  version=$VERSION${NC}"
-    echo -e "${GREEN}  versionCode=$VERSION_CODE${NC}"
-    echo -e "${GREEN}  updateJson=$UPDATE_JSON_URL${NC}"
+    
+    local module_version="$VERSION_FULL"
+    
+    sed -i "s|^version=.*|version=$module_version|" "$module_prop"
+    sed -i "s|^versionCode=.*|versionCode=$version_code|" "$module_prop"
+    sed -i "s|^updateJson=.*|updateJson=$UPDATE_JSON_URL|" "$module_prop"
+    
+    log_info "module.prop configured ($module_version, code $version_code)"
+}
 
-    # Step 5: Copy bin directory to build directory
-    echo -e "\n${YELLOW}[5/7] Copying bin directory...${NC}"
+# Build single type
+build_single_type() {
+    local build_type=$1
+    local build_dir="build/${build_type}_temp"
+    local version_code=$(git rev-list --count HEAD)
+    local output_name="meta-magic_mount-${VERSION_FULL}-${build_type}.zip"
+    
+    # Register this temp directory for cleanup
+    TEMP_DIRS+=("$build_dir")
+    TEMP_DIRS+=("src/bin")
+    
+    log_info ""
+    log_info "========================================"
+    log_info "Building $build_type version"
+    log_info "Version: $VERSION_FULL"
+    log_info "========================================"
+    
+    # Clean and create build directory
+    rm -rf "$build_dir"
+    mkdir -p "$build_dir" || {
+        log_error "Failed to create build directory: $build_dir"
+        return 1
+    }
+    
+    # Step 1: Copy template
+    log_step 1 6 "Copying template"
+    if ! cp -r template/* "$build_dir/"; then
+        log_error "Failed to copy template"
+        return 1
+    fi
+    
+    # Step 2: Build binaries
+    build_binaries "$build_type" || return 1
+    
+    # Step 3: Configure module
+    configure_module "$build_dir" "$build_type" "$version_code" || return 1
+    
+    # Step 4: Copy binaries
+    log_step 4 6 "Copying binaries"
     if [ ! -d "src/bin" ]; then
-        echo -e "${RED}Error: src/bin directory does not exist${NC}"
+        log_error "src/bin not found"
         return 1
     fi
-
-    cp -r src/bin "$BUILD_DIR/"
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Error: Failed to copy bin directory${NC}"
+    if ! cp -r src/bin "$build_dir/"; then
+        log_error "Failed to copy binaries"
         return 1
     fi
-    echo -e "${GREEN}bin directory copied${NC}"
-
-    # Step 6: Package as zip
-    echo -e "\n${YELLOW}[6/7] Packaging module...${NC}"
-
-    # Build filename
-    OUTPUT_NAME="meta-magic_mount-${VERSION}-${VERSION_CODE}-${GIT_SUFFIX}-${BUILD_TYPE}.zip"
-
-    # Enter build directory and package
-    cd "$BUILD_DIR" || return 1
-    zip -r "../../build/$OUTPUT_NAME" ./* -x "*.git*"
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Error: Packaging failed${NC}"
-        cd ../..
+    
+    # Step 5: Package
+    log_step 5 6 "Creating package"
+    if ! (cd "$build_dir" && zip -qr "../../build/$output_name" ./*); then
+        log_error "Failed to create package"
         return 1
     fi
-    cd ../..
-
-    # Step 7: Generate update JSON for this build
-    if [ "$BUILD_TYPE" = "release" ]; then
-        generate_main_update_json "$OUTPUT_NAME" "$VERSION_CODE"
+    
+    # Step 6: Generate misc for release
+    if [ "$build_type" = "release" ]; then
+        log_step 6 6 "Generating misc"
+        # Generate changelog once
+        generate_changelog
+        generate_update_json "$output_name" "$version_code"
+    else
+        log_step 6 6 "Skipping misc (debug build)"
     fi
-
-    # Clean up temporary build directory
-    rm -rf "$BUILD_DIR"
     
-    # Clean up src/bin
-    if [ -d "src/bin" ]; then
-        rm -rf src/bin
-    fi
-
-    echo -e "\n${GREEN}========================================${NC}"
-    echo -e "${GREEN}Build completed!${NC}"
-    echo -e "${GREEN}Output file: build/$OUTPUT_NAME${NC}"
-    echo -e "${GREEN}========================================${NC}"
+    local size=$(du -h "build/$output_name" | cut -f1)
+    log_info ""
+    log_info "========================================="
+    log_info "Build complete: $output_name ($size)"
+    log_info "========================================="
     
-    # Export for summary
-    LAST_OUTPUT_NAME="$OUTPUT_NAME"
-    LAST_VERSION_CODE="$VERSION_CODE"
-    
-    return 0
+    artifact="$output_name"
 }
 
-# Create build directory if it doesn't exist
-if [ ! -d "build" ]; then
-    mkdir build
-fi
-
-# Generate changelog once for all builds
-generate_changelog "build/changelog.md"
-
-# Build for each specified type
-SUCCESS_COUNT=0
-FAIL_COUNT=0
-LAST_OUTPUT_NAME=""
-LAST_VERSION_CODE=""
-
-for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
-    build_for_type "$BUILD_TYPE"
-    if [ $? -eq 0 ]; then
-        ((SUCCESS_COUNT++))
-    else
-        ((FAIL_COUNT++))
-        echo -e "${RED}Failed to build $BUILD_TYPE version${NC}"
+# Main build process
+main() {
+    parse_args "$@"
+    check_prerequisites
+    get_version_info
+    
+    # Setup build directory
+    mkdir -p build
+    
+    # Build each type
+    local success=0
+    local failed=0
+    local built_files=()
+    
+    for build_type in "${BUILD_TYPES[@]}"; do
+        if build_single_type "$build_type"; then
+            ((success++))
+            built_files+=("$artifact")
+        else
+            ((failed++))
+            log_error "Failed to build $build_type"
+        fi
+    done
+    
+    # Print summary
+    log_info ""
+    log_info "========================================"
+    log_info "Build Summary"
+    log_info "========================================"
+    log_info "Version: $VERSION_FULL"
+    log_info "Commit: $GIT_COMMIT"
+    log_info "Success: $success | Failed: $failed"
+    log_info "----------------------------------------"
+    log_info "Generated files:"
+    if [[ " ${BUILD_TYPES[*]} " =~ " release " ]]; then
+        log_info "  build/changelog.md"
+        log_info "  build/update.json"
     fi
-done
+    for file in "${built_files[@]}"; do
+        local size=$(du -h "build/$file" | cut -f1)
+        log_info "  build/$file ($size)"
+    done
+    log_info "========================================"
+    
+    [ $failed -gt 0 ] && exit 1
+    exit 0
+}
 
-# Print summary
-echo -e "\n${GREEN}========================================${NC}"
-echo -e "${GREEN}Build Summary${NC}"
-echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}Version: $VERSION${NC}"
-echo -e "${GREEN}Total builds: ${#BUILD_TYPES[@]}${NC}"
-echo -e "${GREEN}Successful: $SUCCESS_COUNT${NC}"
-if [ $FAIL_COUNT -gt 0 ]; then
-    echo -e "${RED}Failed: $FAIL_COUNT${NC}"
-fi
-echo -e "${GREEN}----------------------------------------${NC}"
-echo -e "${GREEN}Generated files:${NC}"
-echo -e "${GREEN}  - Changelog: build/changelog.md${NC}"
-# Check if release was built
-for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
-    if [ "$BUILD_TYPE" = "release" ]; then
-        echo -e "${GREEN}  - Main update JSON: build/update.json${NC}"
-        break
-    fi
-done
-echo -e "${GREEN}  - ZIP packages: build/*.zip${NC}"
-echo -e "${GREEN}========================================${NC}"
-echo -e "${YELLOW}Note: Update JSON URL in module.prop: $UPDATE_JSON_URL${NC}"
-echo -e "${YELLOW}Make sure to upload update.json to the correct location!${NC}"
-echo -e "${GREEN}========================================${NC}"
-
-# Exit with error if any build failed
-if [ $FAIL_COUNT -gt 0 ]; then
-    exit 1
-fi
-
-exit 0
+main "$@"
