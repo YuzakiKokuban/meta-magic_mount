@@ -8,7 +8,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <libgen.h>
-#include <limits.h>
+#include <limits.h> 
 
 bool check_overlayfs_support(const char *test_dir) {
     FILE *fp = fopen("/proc/filesystems", "r");
@@ -29,12 +29,23 @@ bool check_overlayfs_support(const char *test_dir) {
 static int prepare_workdir(const char *module_path, char *workdir_out, size_t size) {
     
     char temp_path[PATH_MAX];
-    snprintf(temp_path, sizeof(temp_path), "%s", module_path);
+    if ((size_t)snprintf(temp_path, sizeof(temp_path), "%s", module_path) >= sizeof(temp_path)) {
+        return -1;
+    }
     
-    char *dname = dirname(temp_path);
-    char *bname = basename((char *)module_path); 
+    char *path_dup = strdup(temp_path);
+    if (!path_dup) return -1;
+
+    char *dname = dirname(path_dup);
+    
+    char *path_dup2 = strdup(temp_path);
+    if (!path_dup2) { free(path_dup); return -1; }
+    char *bname = basename(path_dup2); 
     
     snprintf(workdir_out, size, "%s/.work_%s", dname, bname);
+    
+    free(path_dup);
+    free(path_dup2);
     
     if (mkdir_p(workdir_out) != 0) {
         return -1;
@@ -44,6 +55,7 @@ static int prepare_workdir(const char *module_path, char *workdir_out, size_t si
     if (stat(module_path, &st) == 0) {
         chmod(workdir_out, st.st_mode);
         chown(workdir_out, st.st_uid, st.st_gid);
+        
         char *con = NULL;
         if (get_selinux(module_path, &con) == 0 && con) {
             set_selinux(workdir_out, con);
@@ -69,7 +81,7 @@ int mount_overlayfs(const char *base_path,
     int len = snprintf(opts, sizeof(opts), "lowerdir=%s,upperdir=%s,workdir=%s", 
              base_path, module_path, workdir);
              
-    if (len >= sizeof(opts)) {
+    if (len >= (int)sizeof(opts)) {
         LOGE("OverlayFS: Mount options too long");
         return -1;
     }
