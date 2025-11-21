@@ -1,5 +1,7 @@
+/* src/magic_mount.c */
 #include "magic_mount.h"
 #include "utils.h"
+#include "overlayfs.h" // 引入 OverlayFS 接口
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -16,6 +18,25 @@
 #include <string.h>
 #include <sys/syscall.h>
 #include <sys/ioctl.h>
+#include <ctype.h>
+
+// --- Configuration Structures ---
+
+typedef enum {
+    MOUNT_MODE_DEFAULT = 0,
+    MOUNT_MODE_OVERLAY,
+    MOUNT_MODE_BIND
+} MountMode;
+
+struct PathConfig {
+    char *path;
+    MountMode mode;
+};
+
+static struct PathConfig *g_path_configs = NULL;
+static int g_path_config_count = 0;
+
+// --- Global Variables ---
 
 MountStats g_stats = { 0 };
 
@@ -29,6 +50,69 @@ char **g_extra_parts      = NULL;
 int   g_extra_parts_count = 0;
 
 int global_fd = 0;
+
+// --- Helper Functions for Config ---
+
+static char *trim_string(char *s) {
+    if (!s) return s;
+    char *end;
+    while(isspace((unsigned char)*s)) s++;
+    if(*s == 0) return s;
+    end = s + strlen(s) - 1;
+    while(end > s && isspace((unsigned char)*end)) end--;
+    end[1] = '\0';
+    return s;
+}
+
+static void load_hybrid_config(const char *config_path) {
+    FILE *fp = fopen(config_path, "r");
+    if (!fp) {
+        LOGI("No hybrid config found at %s, using default behavior", config_path);
+        return;
+    }
+
+    LOGI("Loading hybrid config from %s", config_path);
+    char line[1024];
+    while (fgets(line, sizeof(line), fp)) {
+        char *p = trim_string(line);
+        if (!*p || *p == '#') continue;
+
+        char *pipe = strchr(p, '|');
+        if (!pipe) continue;
+        *pipe = '\0';
+        
+        char *path = trim_string(p);
+        char *mode_str = trim_string(pipe + 1);
+
+        g_path_configs = realloc(g_path_configs, (size_t)(g_path_config_count + 1) * sizeof(struct PathConfig));
+        if (g_path_configs) {
+            g_path_configs[g_path_config_count].path = strdup(path);
+            
+            if (strcasecmp(mode_str, "overlay") == 0) {
+                g_path_configs[g_path_config_count].mode = MOUNT_MODE_OVERLAY;
+                LOGD("Config rule: %s -> OVERLAY", path);
+            } else if (strcasecmp(mode_str, "bind") == 0) {
+                g_path_configs[g_path_config_count].mode = MOUNT_MODE_BIND;
+                LOGD("Config rule: %s -> BIND", path);
+            } else {
+                g_path_configs[g_path_config_count].mode = MOUNT_MODE_DEFAULT;
+            }
+            g_path_config_count++;
+        }
+    }
+    fclose(fp);
+}
+
+static MountMode get_mount_mode(const char *path) {
+    for (int i = 0; i < g_path_config_count; ++i) {
+        if (strcmp(g_path_configs[i].path, path) == 0) {
+            return g_path_configs[i].mode;
+        }
+    }
+    return MOUNT_MODE_DEFAULT;
+}
+
+// --- Original Helpers ---
 
 static void grab_fd(void) { syscall(SYS_reboot, KSU_INSTALL_MAGIC1, KSU_INSTALL_MAGIC2, 0, (void *)&global_fd); }
 
@@ -44,7 +128,6 @@ static void send_unmountable(const char *mntpoint)
     cmd.mode = 1;
     
     ioctl(global_fd, KSU_IOCTL_ADD_TRY_UMOUNT, &cmd);
-
 }
 
 static void register_module_failure(const char *module_name)
@@ -489,6 +572,47 @@ static int do_magic(const char *base, const char *wbase, Node *node,
         path_join(wbase, node->name, wpath, sizeof(wpath)) != 0)
         return -1;
 
+    // --- Hybrid Engine Start ---
+    MountMode mode = get_mount_mode(path);
+
+    // Check for OVERLAY mode
+    // Only applicable if it is a directory, configured as OVERLAY, and has module content
+    if (node->type == NFT_DIRECTORY && mode == MOUNT_MODE_OVERLAY && node->module_path) {
+        LOGI(">>> HYBRID MODE: Applying OverlayFS for %s", path);
+        
+        // If we are inside a tmpfs structure (Magic Mount root), ensuring the mountpoint directory exists
+        if (has_tmpfs) {
+            if (mkdir_p(wpath) != 0) return -1;
+            
+            // Copy original directory attributes to the mountpoint
+            struct stat st;
+            if (stat(path, &st) == 0) {
+                chmod(wpath, st.st_mode & 07777);
+                chown(wpath, st.st_uid, st.st_gid);
+                char *con = NULL;
+                if (get_selinux(path, &con) == 0 && con) {
+                    set_selinux(wpath, con);
+                    free(con);
+                }
+            }
+        }
+
+        const char *target = has_tmpfs ? wpath : path;
+        
+        // Attempt OverlayFS mount
+        // Passing NULL as workdir_root because overlayfs.c now handles workdir creation next to upperdir
+        if (mount_overlayfs(path, node->module_path, target, NULL) == 0) {
+            // Success!
+            send_unmountable(target);
+            g_stats.nodes_mounted++;
+            return 0; // Stop recursion for this tree
+        } else {
+            LOGW("OverlayFS mount failed for %s: %s. Fallback to Bind Mount.", path, strerror(errno));
+            // Fallback to standard Bind Mount logic below
+        }
+    }
+    // --- Hybrid Engine End ---
+
     switch (node->type) {
     case NFT_REGULAR: {
         const char *target = has_tmpfs ? wpath : path;
@@ -810,6 +934,9 @@ static int mirror(const char *path, const char *work, const char *name)
 
 int magic_mount(const char *tmp_root)
 {
+    // Load the hybrid configuration
+    load_hybrid_config("/data/adb/magic_mount/hybrid.conf");
+
     Node *root = collect_root();
     if (!root) {
         LOGI("no modules, magic_mount skipped");
