@@ -7,7 +7,7 @@ CC       := $(ZIG) cc
 STRIPPER := strip
 
 # source files
-SRCS     := utils.c magic_mount.c main.c
+SRCS     := utils.c magic_mount.c main.c overlayfs.c
 
 # output directory
 OUTDIR   := bin
@@ -15,6 +15,7 @@ OUTDIR   := bin
 # common flags
 CFLAGS_COMMON := -Wl,--gc-sections -static -Wpedantic -Werror
 CFLAGS_COMMON += -DVERSION=\"$(VERSION)\"
+CFLAGS_COMMON += -D_GNU_SOURCE
 
 LDFLAGS_COMMON := -static
 

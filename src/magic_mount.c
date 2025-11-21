@@ -1,6 +1,7 @@
+/* src/magic_mount.c */
 #include "magic_mount.h"
 #include "utils.h"
-
+#include "overlayfs.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
@@ -16,6 +17,25 @@
 #include <string.h>
 #include <sys/syscall.h>
 #include <sys/ioctl.h>
+#include <ctype.h>
+
+// --- Configuration Structures ---
+
+typedef enum {
+    MOUNT_MODE_DEFAULT = 0,
+    MOUNT_MODE_OVERLAY,
+    MOUNT_MODE_BIND
+} MountMode;
+
+struct PathConfig {
+    char *path;
+    MountMode mode;
+};
+
+static struct PathConfig *g_path_configs = NULL;
+static int g_path_config_count = 0;
+
+// --- Global Variables ---
 
 MountStats g_stats = { 0 };
 
@@ -29,6 +49,69 @@ char **g_extra_parts      = NULL;
 int   g_extra_parts_count = 0;
 
 int global_fd = 0;
+
+// --- Helper Functions for Config ---
+
+static char *trim_string(char *s) {
+    if (!s) return s;
+    char *end;
+    while(isspace((unsigned char)*s)) s++;
+    if(*s == 0) return s;
+    end = s + strlen(s) - 1;
+    while(end > s && isspace((unsigned char)*end)) end--;
+    end[1] = '\0';
+    return s;
+}
+
+static void load_hybrid_config(const char *config_path) {
+    FILE *fp = fopen(config_path, "r");
+    if (!fp) {
+        LOGI("No hybrid config found at %s, using default behavior", config_path);
+        return;
+    }
+
+    LOGI("Loading hybrid config from %s", config_path);
+    char line[1024];
+    while (fgets(line, sizeof(line), fp)) {
+        char *p = trim_string(line);
+        if (!*p || *p == '#') continue;
+
+        char *pipe = strchr(p, '|');
+        if (!pipe) continue;
+        *pipe = '\0';
+        
+        char *path = trim_string(p);
+        char *mode_str = trim_string(pipe + 1);
+
+        g_path_configs = realloc(g_path_configs, (size_t)(g_path_config_count + 1) * sizeof(struct PathConfig));
+        if (g_path_configs) {
+            g_path_configs[g_path_config_count].path = strdup(path);
+            
+            if (strcasecmp(mode_str, "overlay") == 0) {
+                g_path_configs[g_path_config_count].mode = MOUNT_MODE_OVERLAY;
+                LOGD("Config rule: %s -> OVERLAY", path);
+            } else if (strcasecmp(mode_str, "bind") == 0) {
+                g_path_configs[g_path_config_count].mode = MOUNT_MODE_BIND;
+                LOGD("Config rule: %s -> BIND", path);
+            } else {
+                g_path_configs[g_path_config_count].mode = MOUNT_MODE_DEFAULT;
+            }
+            g_path_config_count++;
+        }
+    }
+    fclose(fp);
+}
+
+static MountMode get_mount_mode(const char *path) {
+    for (int i = 0; i < g_path_config_count; ++i) {
+        if (strcmp(g_path_configs[i].path, path) == 0) {
+            return g_path_configs[i].mode;
+        }
+    }
+    return MOUNT_MODE_DEFAULT;
+}
+
+// --- Original Helpers ---
 
 static void grab_fd(void) { syscall(SYS_reboot, KSU_INSTALL_MAGIC1, KSU_INSTALL_MAGIC2, 0, (void *)&global_fd); }
 
@@ -44,7 +127,6 @@ static void send_unmountable(const char *mntpoint)
     cmd.mode = 1;
     
     ioctl(global_fd, KSU_IOCTL_ADD_TRY_UMOUNT, &cmd);
-
 }
 
 static void register_module_failure(const char *module_name)
@@ -415,440 +497,3 @@ static Node *collect_root(void)
         if (child && node_add_child(root, child) != 0) {
             node_free(child);
             node_free(root);
-            node_free(system);
-            return NULL;
-        }
-    }
-
-    for (int i = 0; i < g_extra_parts_count; ++i) {
-        const char *name = g_extra_parts[i];
-
-        if (path_join("/", name, rp, sizeof(rp)) != 0) {
-            node_free(root);
-            node_free(system);
-            return NULL;
-        }
-
-        if (!path_is_dir(rp))
-            continue;
-
-        Node *child = node_take_child(system, name);
-        if (child && node_add_child(root, child) != 0) {
-            node_free(child);
-            node_free(root);
-            node_free(system);
-            return NULL;
-        }
-    }
-
-    if (node_add_child(root, system) != 0) {
-        node_free(root);
-        node_free(system);
-        return NULL;
-    }
-
-    return root;
-}
-
-static int clone_symlink(const char *src, const char *dst)
-{
-    char target[PATH_MAX];
-
-    ssize_t len = readlink(src, target, sizeof(target) - 1);
-    if (len < 0) {
-        LOGE("readlink %s: %s", src, strerror(errno));
-        return -1;
-    }
-
-    target[len] = '\0';
-
-    if (symlink(target, dst) < 0) {
-        LOGE("symlink %s->%s: %s", dst, target, strerror(errno));
-        return -1;
-    }
-
-    char *con = NULL;
-    if (get_selinux(src, &con) == 0 && con) {
-        set_selinux(dst, con);
-        free(con);
-    }
-
-    LOGD("clone symlink %s -> %s (%s)", src, dst, target);
-    return 0;
-}
-
-static int mirror(const char *path, const char *work, const char *name);
-
-static int do_magic(const char *base, const char *wbase, Node *node,
-                    bool has_tmpfs)
-{
-    char path[PATH_MAX];
-    char wpath[PATH_MAX];
-
-    if (path_join(base, node->name, path, sizeof(path)) != 0 ||
-        path_join(wbase, node->name, wpath, sizeof(wpath)) != 0)
-        return -1;
-
-    switch (node->type) {
-    case NFT_REGULAR: {
-        const char *target = has_tmpfs ? wpath : path;
-
-        if (has_tmpfs) {
-            if (mkdir_p(wbase) != 0)
-                return -1;
-
-            int fd = open(wpath, O_CREAT | O_WRONLY, 0644);
-            if (fd < 0) {
-                LOGE("create %s: %s", wpath, strerror(errno));
-                return -1;
-            }
-            close(fd);
-        }
-
-        if (!node->module_path) {
-            LOGE("no module file for %s", path);
-            errno = EINVAL;
-            return -1;
-        }
-
-        LOGD("bind %s -> %s", node->module_path, target);
-
-        if (mount(node->module_path, target, NULL, MS_BIND, NULL) < 0) {
-            LOGE("bind %s->%s: %s", node->module_path, target,
-                 strerror(errno));
-            return -1;
-        } else
-        	send_unmountable(target); // tell ksu about this mount
-
-        (void)mount(NULL, target, NULL,
-                    MS_REMOUNT | MS_BIND | MS_RDONLY, NULL);
-
-        g_stats.nodes_mounted++;
-        return 0;
-    }
-
-    case NFT_SYMLINK: {
-        if (!node->module_path) {
-            LOGE("no module symlink for %s", path);
-            errno = EINVAL;
-            return -1;
-        }
-
-        if (clone_symlink(node->module_path, wpath) != 0)
-            return -1;
-
-        g_stats.nodes_mounted++;
-        return 0;
-    }
-
-    case NFT_WHITEOUT:
-        LOGD("whiteout %s", path);
-        g_stats.nodes_whiteout++;
-        return 0;
-
-    case NFT_DIRECTORY: {
-        bool create_tmp =
-            (!has_tmpfs && node->replace && node->module_path);
-
-        if (!has_tmpfs && !create_tmp) {
-            for (size_t i = 0; i < node->child_count; ++i) {
-                Node *c = node->children[i];
-                char rp[PATH_MAX];
-
-                if (path_join(path, c->name, rp, sizeof(rp)) != 0)
-                    return -1;
-
-                bool need = false;
-
-                if (c->type == NFT_SYMLINK) {
-                    need = true;
-                } else if (c->type == NFT_WHITEOUT) {
-                    need = path_exists(rp);
-                } else {
-                    struct stat st;
-                    if (lstat(rp, &st) == 0) {
-                        NodeFileType rt = node_type_from_stat(&st);
-                        if (rt != c->type || rt == NFT_SYMLINK)
-                            need = true;
-                    } else {
-                        need = true;
-                    }
-                }
-
-                if (need) {
-                    if (!node->module_path) {
-                        LOGE("cannot create tmpfs on %s (%s)",
-                             path, c->name);
-                        c->skip = true;
-                        g_stats.nodes_skipped++;
-                        continue;
-                    }
-                    create_tmp = true;
-                    break;
-                }
-            }
-        }
-
-        bool now_tmp = has_tmpfs || create_tmp;
-
-        if (now_tmp) {
-            if (mkdir_p(wpath) != 0)
-                return -1;
-
-            struct stat st;
-            const char *meta_path = NULL;
-
-            if (stat(path, &st) == 0) {
-                meta_path = path;
-            } else if (node->module_path &&
-                       stat(node->module_path, &st) == 0) {
-                meta_path = node->module_path;
-            } else {
-                LOGE("no dir meta for %s", path);
-                errno = ENOENT;
-                return -1;
-            }
-
-            chmod(wpath, st.st_mode & 07777);
-            chown(wpath, st.st_uid, st.st_gid);
-
-            char *con = NULL;
-            if (get_selinux(meta_path, &con) == 0 && con) {
-                set_selinux(wpath, con);
-                free(con);
-            }
-        }
-
-        if (create_tmp) {
-            if (mount(wpath, wpath, NULL, MS_BIND, NULL) < 0) {
-                LOGE("bind self %s: %s", wpath, strerror(errno));
-                return -1;
-            }
-        }
-
-        if (path_exists(path) && !node->replace) {
-            DIR *d = opendir(path);
-            if (!d) {
-                LOGE("opendir %s: %s", path, strerror(errno));
-                if (now_tmp)
-                    return -1;
-            } else {
-                struct dirent *de;
-                while ((de = readdir(d))) {
-                    if (!strcmp(de->d_name, ".") ||
-                        !strcmp(de->d_name, "..")) {
-                        continue;
-                    }
-
-                    Node *c = node_find_child(node, de->d_name);
-                    int r = 0;
-
-                    if (c) {
-                        if (c->skip) {
-                            c->done = true;
-                            continue;
-                        }
-                        c->done = true;
-                        r = do_magic(path, wpath, c, now_tmp);
-                    } else if (now_tmp) {
-                        r = mirror(path, wpath, de->d_name);
-                    }
-
-                    if (r != 0) {
-                        const char *mn = NULL;
-
-                        if (c && c->module_name)
-                            mn = c->module_name;
-                        else if (node->module_name)
-                            mn = node->module_name;
-
-                        if (mn) {
-                            LOGE("child %s/%s failed (module: %s)",
-                                 path,
-                                 c ? c->name : de->d_name,
-                                 mn);
-                            register_module_failure(mn);
-                        } else {
-                            LOGE("child %s/%s failed (no module_name)",
-                                 path,
-                                 c ? c->name : de->d_name);
-                        }
-
-                        g_stats.nodes_fail++;
-
-                        if (now_tmp) {
-                            closedir(d);
-                            return -1;
-                        }
-                    }
-                }
-                closedir(d);
-            }
-        }
-
-        for (size_t i = 0; i < node->child_count; ++i) {
-            Node *c = node->children[i];
-            if (c->skip || c->done)
-                continue;
-
-            int r = do_magic(path, wpath, c, now_tmp);
-            if (r != 0) {
-                const char *mn = c->module_name ?
-                                 c->module_name :
-                                 node->module_name;
-
-                if (mn) {
-                    LOGE("child %s/%s failed (module: %s)",
-                         path, c->name, mn);
-                    register_module_failure(mn);
-                } else {
-                    LOGE("child %s/%s failed (no module_name)",
-                         path, c->name);
-                }
-
-                g_stats.nodes_fail++;
-                if (now_tmp)
-                    return -1;
-            }
-        }
-
-        if (create_tmp) {
-            (void)mount(NULL, wpath, NULL,
-                        MS_REMOUNT | MS_BIND | MS_RDONLY, NULL);
-
-            if (mount(wpath, path, NULL, MS_MOVE, NULL) < 0) {
-                LOGE("move %s->%s failed: %s", wpath, path,
-                     strerror(errno));
-                if (node->module_name)
-                    register_module_failure(node->module_name);
-                return -1;
-            }
-
-            LOGI("move mountpoint success: %s -> %s", wpath, path);
-            (void)mount(NULL, path, NULL, MS_REC | MS_PRIVATE, NULL);
-
-            // tell ksu about this one too
-            send_unmountable(path);
-
-        }
-
-        g_stats.nodes_mounted++;
-        return 0;
-    }
-    }
-
-    return 0;
-}
-
-static int mirror(const char *path, const char *work, const char *name)
-{
-    char src[PATH_MAX];
-    char dst[PATH_MAX];
-
-    if (path_join(path, name, src, sizeof(src)) != 0 ||
-        path_join(work, name, dst, sizeof(dst)) != 0)
-        return -1;
-
-    struct stat st;
-    if (lstat(src, &st) < 0) {
-        LOGW("lstat %s: %s", src, strerror(errno));
-        return 0;
-    }
-
-    if (S_ISREG(st.st_mode)) {
-        int fd = open(dst, O_CREAT | O_WRONLY, st.st_mode & 07777);
-        if (fd < 0) {
-            LOGE("create %s: %s", dst, strerror(errno));
-            return -1;
-        }
-        close(fd);
-
-        if (mount(src, dst, NULL, MS_BIND, NULL) < 0) {
-            LOGE("bind %s->%s: %s", src, dst, strerror(errno));
-            return -1;
-        }
-    } else if (S_ISDIR(st.st_mode)) {
-        if (mkdir(dst, st.st_mode & 07777) < 0 && errno != EEXIST) {
-            LOGE("mkdir %s: %s", dst, strerror(errno));
-            return -1;
-        }
-
-        chmod(dst, st.st_mode & 07777);
-        chown(dst, st.st_uid, st.st_gid);
-
-        char *con = NULL;
-        if (get_selinux(src, &con) == 0 && con) {
-            set_selinux(dst, con);
-            free(con);
-        }
-
-        DIR *d = opendir(src);
-        if (!d) {
-            LOGE("opendir %s: %s", src, strerror(errno));
-            return -1;
-        }
-
-        struct dirent *de;
-        while ((de = readdir(d))) {
-            if (!strcmp(de->d_name, ".") ||
-                !strcmp(de->d_name, "..")) {
-                continue;
-            }
-            if (mirror(src, dst, de->d_name) != 0) {
-                closedir(d);
-                return -1;
-            }
-        }
-        closedir(d);
-    } else if (S_ISLNK(st.st_mode)) {
-        if (clone_symlink(src, dst) != 0)
-            return -1;
-    }
-
-    return 0;
-}
-
-int magic_mount(const char *tmp_root)
-{
-    Node *root = collect_root();
-    if (!root) {
-        LOGI("no modules, magic_mount skipped");
-        return 0;
-    }
-
-    char tmp_dir[PATH_MAX];
-    if (path_join(tmp_root, "workdir", tmp_dir, sizeof(tmp_dir)) != 0) {
-        node_free(root);
-        return -1;
-    }
-
-    if (mkdir_p(tmp_dir) != 0) {
-        node_free(root);
-        return -1;
-    }
-    
-    grab_fd();
-
-    LOGI("starting magic_mount core logic: tmpfs_source=%s tmp_dir=%s",
-         g_mount_source, tmp_dir);
-
-    if (mount(g_mount_source, tmp_dir, "tmpfs", 0, "") < 0) {
-        LOGE("mount tmpfs %s: %s", tmp_dir, strerror(errno));
-        node_free(root);
-        return -1;
-    }
-
-    (void)mount(NULL, tmp_dir, NULL, MS_REC | MS_PRIVATE, NULL);
-
-    int rc = do_magic("/", tmp_dir, root, false);
-    if (rc != 0)
-        g_stats.nodes_fail++;
-
-    if (umount2(tmp_dir, MNT_DETACH) < 0)
-        LOGE("umount %s: %s", tmp_dir, strerror(errno));
-
-    (void)rmdir(tmp_dir);
-
-    node_free(root);
-    return rc;
-}
