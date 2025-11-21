@@ -2,6 +2,7 @@
   "en": {
     "tabs": {
       "config": "Config",
+      "rules": "Rules",
       "logs": "Logs"
     },
     "config": {
@@ -25,6 +26,20 @@
       "verboseOff": "Info",
       "verboseOn": "Debug"
     },
+    "rules": {
+      "title": "Hybrid Mount Rules",
+      "desc": "Define mount strategies for specific paths. Default is recursive Bind Mount.",
+      "reload": "Reload",
+      "save": "Save Rules",
+      "add": "Add Rule",
+      "pathHeader": "Path",
+      "modeHeader": "Mode",
+      "actionHeader": "Action",
+      "modeOverlay": "OverlayFS",
+      "modeBind": "Bind Mount",
+      "saveSuccess": "Rules saved successfully.",
+      "saveFailed": "Failed to save rules."
+    },
     "logs": {
       "title": "Log Viewer",
       "select": "Log File",
@@ -40,6 +55,7 @@
   "zh": {
     "tabs": {
       "config": "配置",
+      "rules": "规则",
       "logs": "日志"
     },
     "config": {
@@ -62,6 +78,20 @@
       "verboseLabel": "日志级别",
       "verboseOff": "信息",
       "verboseOn": "调试"
+    },
+    "rules": {
+      "title": "混合挂载规则",
+      "desc": "为特定路径定义挂载策略。默认为递归绑定挂载 (Bind Mount)。",
+      "reload": "重载",
+      "save": "保存规则",
+      "add": "添加规则",
+      "pathHeader": "路径",
+      "modeHeader": "模式",
+      "actionHeader": "操作",
+      "modeOverlay": "OverlayFS (无痕)",
+      "modeBind": "Bind Mount (兼容)",
+      "saveSuccess": "规则保存成功。",
+      "saveFailed": "保存规则失败。"
     },
     "logs": {
       "title": "日志查看",

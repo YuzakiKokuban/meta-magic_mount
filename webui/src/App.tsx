@@ -4,8 +4,9 @@ import locate from "./locate.json";
 import "./index.css";
 
 type Lang = keyof typeof locate; // "en" | "zh"
-type Tab = "config" | "log";
+type Tab = "config" | "rules" | "log";
 
+// --- Config Types ---
 type ConfigState = {
   moduledir: string;
   tempdir: string;
@@ -25,6 +26,14 @@ const DEFAULT_CONFIG: ConfigState = {
 };
 
 const CONFIG_PATH = "/data/adb/magic_mount/mm.conf";
+const HYBRID_CONFIG_PATH = "/data/adb/magic_mount/hybrid.conf";
+
+// --- Rule Types ---
+type RuleMode = "overlay" | "bind";
+type HybridRule = {
+  path: string;
+  mode: RuleMode;
+};
 
 const App: React.FC = () => {
   // ---------- i18n ----------
@@ -51,6 +60,12 @@ const App: React.FC = () => {
   const [configLoading, setConfigLoading] = useState(false);
   const [configSaving, setConfigSaving] = useState(false);
   const [configMessage, setConfigMessage] = useState<string | null>(null);
+
+  // ---------- rules state ----------
+  const [rules, setRules] = useState<HybridRule[]>([]);
+  const [rulesLoading, setRulesLoading] = useState(false);
+  const [rulesSaving, setRulesSaving] = useState(false);
+  const [rulesMessage, setRulesMessage] = useState<string | null>(null);
 
   // ---------- log state ----------
   type LogSelection = "current" | "old";
@@ -209,6 +224,7 @@ const App: React.FC = () => {
       const configToSave: ConfigState = { ...config, partitions };
 
       const content = serializeKvConfig(configToSave);
+      // simple escape for single quotes
       const escapedContent = content.replace(/'/g, "'\\''");
 
       const shell = `
@@ -230,6 +246,73 @@ const App: React.FC = () => {
       setConfigMessage(L.config.saveError);
     } finally {
       setConfigSaving(false);
+    }
+  };
+
+  // ---------- read rules ----------
+  const loadRules = async () => {
+    setRulesLoading(true);
+    setRulesMessage(null);
+    try {
+      const { errno, stdout } = await exec(
+        `[ -f "${HYBRID_CONFIG_PATH}" ] && cat "${HYBRID_CONFIG_PATH}" || echo ""`,
+      );
+
+      if (errno !== 0) {
+        setRules([]);
+        return;
+      }
+
+      const newRules: HybridRule[] = [];
+      const lines = stdout.split("\n");
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const parts = trimmed.split("|");
+        if (parts.length === 2) {
+          const path = parts[0].trim();
+          const modeStr = parts[1].trim().toLowerCase();
+          if (modeStr === "overlay" || modeStr === "bind") {
+            newRules.push({ path, mode: modeStr as RuleMode });
+          }
+        }
+      }
+      setRules(newRules);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setRulesLoading(false);
+    }
+  };
+
+  // ---------- save rules ----------
+  const saveRules = async () => {
+    setRulesSaving(true);
+    setRulesMessage(null);
+    try {
+      let content = "# Hybrid Mount Rules\n# Path|Mode\n\n";
+      for (const r of rules) {
+        if (r.path.trim()) {
+          content += `${r.path.trim()}|${r.mode}\n`;
+        }
+      }
+      const escaped = content.replace(/'/g, "'\\''");
+      const shell = `
+        mkdir -p "$(dirname "${HYBRID_CONFIG_PATH}")" && \
+        printf '%s\n' '${escaped}' > "${HYBRID_CONFIG_PATH}"
+      `;
+      const { errno, stderr } = await exec(shell);
+      if (errno !== 0) {
+        console.error(stderr);
+        setRulesMessage(L.rules.saveFailed);
+      } else {
+        setRulesMessage(L.rules.saveSuccess);
+      }
+    } catch (e) {
+      console.error(e);
+      setRulesMessage(L.rules.saveFailed);
+    } finally {
+      setRulesSaving(false);
     }
   };
 
@@ -260,19 +343,21 @@ const App: React.FC = () => {
     }
   };
 
-  // initial load config
+  // initial load
   useEffect(() => {
     loadConfig();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // reload log when tab or file changed
+  // reload data when tab changed
   useEffect(() => {
     if (activeTab === "log") {
       loadLog();
+    } else if (activeTab === "rules") {
+      loadRules();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, logSelection, config.logfile]);
+  }, [activeTab, logSelection]);
 
   // ---------- render tabs ----------
 
@@ -402,6 +487,76 @@ const App: React.FC = () => {
     </div>
   );
 
+  const renderRulesTab = () => (
+    <div className="card">
+      <h2>{L.rules.title}</h2>
+      <p className="hint">{L.rules.desc}</p>
+      {rulesLoading && <p className="hint">Loading...</p>}
+      {rulesMessage && <p className="hint">{rulesMessage}</p>}
+
+      <div className="rules-table">
+        <div className="rules-header">
+          <span style={{ flex: 2 }}>{L.rules.pathHeader}</span>
+          <span style={{ flex: 1 }}>{L.rules.modeHeader}</span>
+          <span style={{ width: "60px" }}>{L.rules.actionHeader}</span>
+        </div>
+        {rules.map((rule, idx) => (
+          <div className="rule-row" key={idx}>
+            <input
+              type="text"
+              style={{ flex: 2 }}
+              value={rule.path}
+              onChange={(e) => {
+                const newRules = [...rules];
+                newRules[idx].path = e.target.value;
+                setRules(newRules);
+              }}
+            />
+            <select
+              style={{ flex: 1 }}
+              value={rule.mode}
+              onChange={(e) => {
+                const newRules = [...rules];
+                newRules[idx].mode = e.target.value as RuleMode;
+                setRules(newRules);
+              }}
+            >
+              <option value="overlay">{L.rules.modeOverlay}</option>
+              <option value="bind">{L.rules.modeBind}</option>
+            </select>
+            <button
+              className="delete-btn"
+              style={{ width: "60px" }}
+              onClick={() => {
+                const newRules = rules.filter((_, i) => i !== idx);
+                setRules(newRules);
+              }}
+            >
+              X
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="actions">
+        <button
+          onClick={() => {
+            setRules([...rules, { path: "", mode: "overlay" }]);
+          }}
+        >
+          {L.rules.add}
+        </button>
+        <div style={{ flex: 1 }}></div>
+        <button onClick={loadRules} disabled={rulesLoading || rulesSaving}>
+          {L.rules.reload}
+        </button>
+        <button className="primary" onClick={saveRules} disabled={rulesLoading || rulesSaving}>
+          {rulesSaving ? "Saving..." : L.rules.save}
+        </button>
+      </div>
+    </div>
+  );
+
   const renderLogTab = () => {
     return (
       <div className="card">
@@ -445,7 +600,11 @@ const App: React.FC = () => {
         </select>
       </div>
 
-      <div className="app-main">{activeTab === "config" ? renderConfigTab() : renderLogTab()}</div>
+      <div className="app-main">
+        {activeTab === "config" && renderConfigTab()}
+        {activeTab === "rules" && renderRulesTab()}
+        {activeTab === "log" && renderLogTab()}
+      </div>
 
       {/* bottom tabs */}
       <div className="bottom-bar">
@@ -454,6 +613,12 @@ const App: React.FC = () => {
           onClick={() => setActiveTab("config")}
         >
           {L.tabs.config}
+        </button>
+        <button
+          className={activeTab === "rules" ? "tab-btn active" : "tab-btn"}
+          onClick={() => setActiveTab("rules")}
+        >
+          {L.tabs.rules}
         </button>
         <button
           className={activeTab === "log" ? "tab-btn active" : "tab-btn"}
