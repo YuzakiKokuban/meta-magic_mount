@@ -1,3 +1,15 @@
 ## Magic Mount Metamodule
 
-Based on https://github.com/5ec1cff/KernelSU/blob/52f1f575ce2bd0ca46ebf644fd00a838af9f344e/userspace/ksud/src/magic_mount.rs
+Implement systemless modification support for KSU.
+
+The branch now uses a **C implementation**.
+
+The previous **Rust implementation** is still available in a separate branch for reference:
+
+Rust branch: `rust`
+
+You can switch to the Rust version with:
+
+```bash
+git checkout rust
+```
