@@ -13,7 +13,7 @@ SRCS     := utils.c magic_mount.c main.c
 OUTDIR   := bin
 
 # common flags
-CFLAGS_COMMON := -Wl,--gc-sections -static
+CFLAGS_COMMON := -Wl,--gc-sections -static -Wpedantic -Werror
 CFLAGS_COMMON += -DVERSION=\"$(VERSION)\"
 
 LDFLAGS_COMMON := -static
