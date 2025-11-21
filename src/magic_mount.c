@@ -1,8 +1,7 @@
 /* src/magic_mount.c */
 #include "magic_mount.h"
 #include "utils.h"
-#include "overlayfs.h" // 引入 OverlayFS 接口
-
+#include "overlayfs.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
@@ -572,47 +571,6 @@ static int do_magic(const char *base, const char *wbase, Node *node,
         path_join(wbase, node->name, wpath, sizeof(wpath)) != 0)
         return -1;
 
-    // --- Hybrid Engine Start ---
-    MountMode mode = get_mount_mode(path);
-
-    // Check for OVERLAY mode
-    // Only applicable if it is a directory, configured as OVERLAY, and has module content
-    if (node->type == NFT_DIRECTORY && mode == MOUNT_MODE_OVERLAY && node->module_path) {
-        LOGI(">>> HYBRID MODE: Applying OverlayFS for %s", path);
-        
-        // If we are inside a tmpfs structure (Magic Mount root), ensuring the mountpoint directory exists
-        if (has_tmpfs) {
-            if (mkdir_p(wpath) != 0) return -1;
-            
-            // Copy original directory attributes to the mountpoint
-            struct stat st;
-            if (stat(path, &st) == 0) {
-                chmod(wpath, st.st_mode & 07777);
-                chown(wpath, st.st_uid, st.st_gid);
-                char *con = NULL;
-                if (get_selinux(path, &con) == 0 && con) {
-                    set_selinux(wpath, con);
-                    free(con);
-                }
-            }
-        }
-
-        const char *target = has_tmpfs ? wpath : path;
-        
-        // Attempt OverlayFS mount
-        // Passing NULL as workdir_root because overlayfs.c now handles workdir creation next to upperdir
-        if (mount_overlayfs(path, node->module_path, target, NULL) == 0) {
-            // Success!
-            send_unmountable(target);
-            g_stats.nodes_mounted++;
-            return 0; // Stop recursion for this tree
-        } else {
-            LOGW("OverlayFS mount failed for %s: %s. Fallback to Bind Mount.", path, strerror(errno));
-            // Fallback to standard Bind Mount logic below
-        }
-    }
-    // --- Hybrid Engine End ---
-
     switch (node->type) {
     case NFT_REGULAR: {
         const char *target = has_tmpfs ? wpath : path;
@@ -934,9 +892,6 @@ static int mirror(const char *path, const char *work, const char *name)
 
 int magic_mount(const char *tmp_root)
 {
-    // Load the hybrid configuration
-    load_hybrid_config("/data/adb/magic_mount/hybrid.conf");
-
     Node *root = collect_root();
     if (!root) {
         LOGI("no modules, magic_mount skipped");
