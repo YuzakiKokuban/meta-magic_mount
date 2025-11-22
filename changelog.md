@@ -6,6 +6,7 @@
 
 Initial release
 
+- Fix output name in build_single_type function (401dbae)
 - v0.1.3 (7b9f85c)
 - feat: add support for susfs 2.0.0 with unmount command enhancements (c890edf)
 - feat: update output name (37029a7)
