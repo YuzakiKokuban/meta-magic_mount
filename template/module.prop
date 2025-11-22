@@ -4,5 +4,5 @@ name=Hybrid Mount Metamodule
 version=version
 versionCode=versionCode
 author=YuzakiKokuban
-description=An metamodule with both OverlayFS and Magic Mount
+description=A metamodule with both OverlayFS and Magic Mount
 updateJson=updateJson
