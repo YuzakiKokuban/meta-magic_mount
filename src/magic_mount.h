@@ -49,4 +49,13 @@ struct ksu_add_try_umount_cmd {
 
 #define KSU_IOCTL_ADD_TRY_UMOUNT _IOC(_IOC_WRITE, 'K', 18, 0)
 
+// susfs
+#define SUSFS_MAX_LEN_PATHNAME 256
+#define KERNEL_SU_OPTION 0xDEADBEEF
+#define CMD_SUSFS_ADD_TRY_UMOUNT 0x55580
+struct st_susfs_try_umount {
+	char                    target_pathname[SUSFS_MAX_LEN_PATHNAME];
+	int                     mnt_mode;
+};
+
 #endif /* MAGIC_MOUNT_H */

@@ -15,6 +15,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/prctl.h>
 #include <sys/syscall.h>
 #include <sys/ioctl.h>
 #include <ctype.h>
@@ -118,6 +119,9 @@ static void grab_fd(void) { syscall(SYS_reboot, KSU_INSTALL_MAGIC1, KSU_INSTALL_
 static void send_unmountable(const char *mntpoint)
 { 
     struct ksu_add_try_umount_cmd cmd = {0};
+    struct st_susfs_try_umount info;
+    char abs_path[PATH_MAX], *p_abs_path;
+    int error = -1;
 
     if (!global_fd)
         return;
@@ -127,6 +131,13 @@ static void send_unmountable(const char *mntpoint)
     cmd.mode = 1;
     
     ioctl(global_fd, KSU_IOCTL_ADD_TRY_UMOUNT, &cmd);
+    strncpy(info.target_pathname, mntpoint, SUSFS_MAX_LEN_PATHNAME-1);
+    p_abs_path = realpath(info.target_pathname, abs_path);
+    if (p_abs_path == NULL) {
+        return;
+    }
+    info.mnt_mode = 1;
+    prctl(KERNEL_SU_OPTION, CMD_SUSFS_ADD_TRY_UMOUNT, &info, NULL, &error);
 }
 
 static void register_module_failure(const char *module_name)
