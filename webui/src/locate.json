@@ -1,30 +1,32 @@
 {
   "en": {
+    "lang": {
+      "display": "English"
+    },
     "tabs": {
       "config": "Config",
-      "rules": "Rules",
+      "modules": "Modules",
       "logs": "Logs"
     },
     "config": {
       "title": "Configuration",
-      "reload": "Reload",
-      "save": "Save",
-      "loadSuccess": "Configuration loaded.",
-      "loadDefault": "No config file found, using defaults.",
-      "loadError": "Failed to read config, using default values.",
-      "saveSuccess": "Configuration saved.",
-      "saveFailed": "Failed to save configuration.",
-      "saveError": "An error occurred while saving.",
-      "pathLabel": "Config file path",
-
+      "verboseLabel": "Log Level",
+      "verboseOff": "Normal",
+      "verboseOn": "Verbose",
       "moduleDir": "Module Directory",
-      "tempDir": "Temporary Directory",
+      "tempDir": "Temp Directory",
       "mountSource": "Mount Source",
       "logFile": "Log File",
       "partitions": "Partitions",
-      "verboseLabel": "Log Level",
-      "verboseOff": "Info",
-      "verboseOn": "Debug"
+      "reload": "Reload",
+      "save": "Save",
+      "pathLabel": "Config Path",
+      "loadError": "Failed to load config",
+      "loadDefault": "Using default config",
+      "loadSuccess": "Config loaded",
+      "saveFailed": "Failed to save config",
+      "saveSuccess": "Config saved successfully",
+      "saveError": "Error saving config"
     },
     "rules": {
       "title": "Hybrid Mount Rules",
@@ -48,43 +50,52 @@
       "saveFailed": "Failed to save rules."
     },
     "logs": {
-      "title": "Log Viewer",
-      "select": "Log File",
-      "refresh": "Refresh",
-      "empty": "(empty)",
-      "readFailed": "Failed to read log file.",
-      "readException": "An exception occurred while reading log.",
+      "title": "Logs",
+      "select": "Select Log File",
       "current": "Current Log",
-      "old": "Old Log"
+      "old": "Old Log",
+      "refresh": "Refresh",
+      "empty": "No logs available",
+      "readFailed": "Failed to read log",
+      "readException": "Error reading log"
+    },
+    "modules": {
+      "title": "Modules",
+      "basePath": "Module Directory",
+      "empty": "No modules found",
+      "reload": "Reload",
+      "loadError": "Failed to load modules",
+      "toggleError": "Failed to toggle module"
     }
   },
-
   "zh": {
+    "lang": {
+      "display": "中文"
+    },
     "tabs": {
       "config": "配置",
-      "rules": "规则",
+      "modules": "模块",
       "logs": "日志"
     },
     "config": {
       "title": "配置",
-      "reload": "重载",
-      "save": "保存",
-      "loadSuccess": "已从配置文件加载。",
-      "loadDefault": "未找到配置文件，已使用默认配置。",
-      "loadError": "读取配置失败，已使用默认配置。",
-      "saveSuccess": "配置已保存。",
-      "saveFailed": "保存失败，请检查权限或日志。",
-      "saveError": "保存配置时发生错误。",
-      "pathLabel": "配置文件路径",
-
+      "verboseLabel": "日志级别",
+      "verboseOff": "普通",
+      "verboseOn": "详细",
       "moduleDir": "模块目录",
       "tempDir": "临时目录",
       "mountSource": "挂载源",
       "logFile": "日志文件",
-      "partitions": "分区列表",
-      "verboseLabel": "日志级别",
-      "verboseOff": "信息",
-      "verboseOn": "调试"
+      "partitions": "分区",
+      "reload": "重新加载",
+      "save": "保存",
+      "pathLabel": "配置路径",
+      "loadError": "加载配置失败",
+      "loadDefault": "使用默认配置",
+      "loadSuccess": "配置已加载",
+      "saveFailed": "保存配置失败",
+      "saveSuccess": "配置保存成功",
+      "saveError": "保存配置出错"
     },
     "rules": {
       "title": "混合挂载规则",
@@ -108,14 +119,22 @@
       "saveFailed": "保存规则失败。"
     },
     "logs": {
-      "title": "日志查看",
-      "select": "日志文件",
-      "refresh": "刷新",
-      "empty": "（空日志）",
-      "readFailed": "读取日志失败。",
-      "readException": "读取日志时发生异常。",
+      "title": "日志",
+      "select": "选择日志文件",
       "current": "当前日志",
-      "old": "旧日志"
+      "old": "旧日志",
+      "refresh": "刷新",
+      "empty": "暂无日志",
+      "readFailed": "读取日志失败",
+      "readException": "读取日志出错"
+    },
+    "modules": {
+      "title": "模块",
+      "basePath": "模块目录",
+      "empty": "未找到模块",
+      "reload": "重新加载",
+      "loadError": "加载模块失败",
+      "toggleError": "切换模块失败"
     }
   }
 }

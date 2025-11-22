@@ -56,19 +56,76 @@ body {
   border-bottom: 1px solid var(--nord2);
 }
 
+/* Language dropdown container */
+.lang-dropdown {
+  position: relative;
+}
+
 .lang-select {
-  padding: 6px 10px;
+  padding: 6px 12px;
   border-radius: 8px;
   border: 1px solid var(--nord2);
   background: var(--nord0);
   color: var(--nord6);
   font-size: 13px;
   outline: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 100px;
+  justify-content: space-between;
+  transition: 0.15s;
 }
 
-.lang-select:focus {
-  border-color: var(--nord8);
-  box-shadow: 0 0 0 2px rgba(136, 192, 208, 0.25);
+.lang-select:hover {
+  background: var(--nord2);
+}
+
+.lang-select .arrow {
+  font-size: 10px;
+  transition: transform 0.2s;
+  display: inline-block;
+}
+
+.lang-select .arrow.open {
+  transform: rotate(180deg);
+}
+
+.lang-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: var(--nord0);
+  border: 1px solid var(--nord2);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  min-width: 100px;
+  z-index: 1000;
+}
+
+.lang-option {
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  color: var(--nord6);
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  transition: 0.15s;
+  display: block;
+}
+
+.lang-option:hover {
+  background: var(--nord2);
+}
+
+.lang-option.active {
+  background: var(--nord8);
+  color: var(--nord0);
+  font-weight: 600;
 }
 
 /* Main content */
@@ -76,6 +133,7 @@ body {
   flex: 1;
   padding: 16px 16px 64px;
   overflow-y: auto;
+  position: relative;
 }
 
 /* ---------- Card ---------- */
@@ -190,8 +248,9 @@ button:disabled {
   color: var(--nord6);
   max-height: 55vh;
   overflow-y: auto;
-  white-space: pre-wrap;
   font-size: 12px;
+  font-family: monospace;
+  text-align: left;
 }
 
 /* ---------- Bottom Tabs ---------- */
@@ -274,10 +333,116 @@ button:disabled {
   padding: 8px 14px;
   white-space: nowrap;
 }
+
 /* top bar title */
 .title {
   font-size: 16px;
   font-weight: 600;
   color: var(--nord6);
   margin-right: auto;
+}
+
+/* module row */
+.module-list {
+  margin-top: 10px;
+}
+
+.module-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.module-name {
+  font-size: 15px;
+}
+
+/* switch slider */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0;
+  right: 0; bottom: 0;
+  background-color: #666;
+  transition: 0.3s;
+  border-radius: 24px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #4caf50;
+}
+
+input:checked + .slider:before {
+  transform: translateX(20px);
+}
+
+/* disabled */
+.switch.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* smaller error text */
+.error.small {
+  font-size: 12px;
+  margin-left: auto;
+  color: #f66;
+}
+
+/* ---------- Tab switching overlay ---------- */
+.tab-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
+}
+
+.tab-spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.25);
+  border-top-color: var(--nord8);
+  animation: tab-spin 0.6s linear infinite;
+}
+
+@keyframes tab-spin {
+  from {
+    transform: rotate(0deg) scale(0.9);
+  }
+  to {
+    transform: rotate(360deg) scale(1);
+  }
 }

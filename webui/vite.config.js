@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { svelte } from '@sveltejs/vite-plugin-svelte'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -7,5 +7,5 @@ export default defineConfig({
   build: {
     outDir: '../template/webroot',
   },
-  plugins: [react()],
+  plugins: [svelte()],
 })
