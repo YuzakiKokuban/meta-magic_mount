@@ -5,7 +5,7 @@
 MODDIR="${0%/*}"
 
 # Binary path (architecture-specific binary selected during installation)
-BINARY="$MODDIR/meta-mm"
+BINARY="$MODDIR/meta-hybrid"
 
 if [ ! -f "$BINARY" ]; then
     log "ERROR: Binary not found: $BINARY"
@@ -18,7 +18,7 @@ MM_LOG_FILE=$(busybox awk -F= '
     sub(/#.*/, "", val)
     gsub(/^[ \t"]+|[ \t"]+$/, "", val)
     print val
-}' /data/adb/magic_mount/mm.conf)
+}' /data/adb/meta-hybrid/config.conf)
 
 if [ -f "$MM_LOG_FILE" ]; then
     mv "$MM_LOG_FILE" "$MM_LOG_FILE".old

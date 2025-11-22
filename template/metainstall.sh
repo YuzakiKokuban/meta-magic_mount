@@ -1,13 +1,13 @@
 #!/system/bin/sh
 ############################################
-# meta-mm metainstall.sh
+# meta-hybrid metainstall.sh
 ############################################
 
 export KSU_HAS_METAMODULE="true"
-export KSU_METAMODULE="meta-mm"
+export KSU_METAMODULE="meta-hybrid"
 
 # Main installation flow
-ui_print "- Using meta-mm metainstall"
+ui_print "- Using meta-hybrid metainstall"
 
 # we no-op handle_partition
 # this way we can support normal hierarchy that ksu changes

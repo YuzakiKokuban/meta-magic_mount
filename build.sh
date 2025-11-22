@@ -7,9 +7,9 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 # Configuration
-BASE_URL="https://github.com/7a72/meta-magic_mount/releases/download"
-UPDATE_JSON_URL="https://raw.githubusercontent.com/7a72/meta-magic_mount/public/update.json"
-CHANGELOG_URL="https://raw.githubusercontent.com/7a72/meta-magic_mount/public/changelog.md"
+BASE_URL="https://github.com/YuzakiKokuban/meta-magic_mount/releases/download"
+UPDATE_JSON_URL="https://raw.githubusercontent.com/YuzakiKokuban/meta-magic_mount/public/update.json"
+CHANGELOG_URL="https://raw.githubusercontent.com/YuzakiKokuban/meta-magic_mount/public/changelog.md"
 
 # Build state
 BUILD_TYPES=()
@@ -27,49 +27,32 @@ log_step() { echo -e "\n${YELLOW}[$1/$2] $3${NC}" >&2; }
 # Cleanup function
 cleanup() {
     local exit_code=$?
-    
     log_warn "Cleaning up temporary directories..."
-    
     for dir in "${TEMP_DIRS[@]}"; do
         if [ -d "$dir" ]; then
             rm -rf "$dir"
             log_info "  Removed: $dir"
         fi
     done
-    
-    # If script failed, show helpful message
     if [ $exit_code -ne 0 ]; then
         log_error "Build failed with exit code $exit_code"
-        log_warn "All temporary files have been cleaned up"
     fi
-    
     exit $exit_code
 }
-
-# Register trap for cleanup
 trap cleanup EXIT INT TERM
 
-# Usage
 usage() {
     cat << EOF
 Usage: $0 [OPTIONS]
-
 OPTIONS:
     --release       Build release version only
     --debug         Build debug version only
     -h, --help      Show this help message
     (no option)     Build both versions
-
-Version is automatically obtained from git tags.
-
-EXAMPLES:
-    $0                      # Build both release and debug
-    $0 --release            # Build release only
 EOF
     exit 1
 }
 
-# Parse arguments
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -79,44 +62,25 @@ parse_args() {
             *) log_error "Unknown parameter: $1"; usage ;;
         esac
     done
-    
-    # Default to both if none specified
     [ ${#BUILD_TYPES[@]} -eq 0 ] && BUILD_TYPES=("release" "debug")
 }
 
-# Check prerequisites
 check_prerequisites() {
-    # Check git repository
-    if ! git rev-parse --git-dir > /dev/null 2>&1; then
-        log_error "Not in a git repository"
-        exit 1
+    if ! git rev-parse --git-dir > /dev/null 2>&1; then log_error "Not in a git repository"; exit 1; fi
+    if ! command -v zig &> /dev/null; then log_error "zig is not installed"; exit 1; fi
+    # Check for pnpm/npm for webui
+    if ! command -v pnpm &> /dev/null && ! command -v npm &> /dev/null; then
+        log_warn "Node.js package manager not found (pnpm/npm). WebUI might not build."
     fi
-    
-    # Check zig
-    if ! command -v zig &> /dev/null; then
-        log_error "zig is not installed"
-        exit 1
-    fi
-    
-    # Check required directories
-    for dir in template src; do
-        if [ ! -d "$dir" ]; then
-            log_error "Required directory '$dir' not found"
-            exit 1
-        fi
+    for dir in template src webui; do
+        if [ ! -d "$dir" ]; then log_error "Required directory '$dir' not found"; exit 1; fi
     done
 }
 
-# Get version information from git
 get_version_info() {
     local describe=$(git describe --tags --long --always --dirty 2>/dev/null)
+    if [ -z "$describe" ]; then log_error "Failed to get git information"; exit 1; fi
     
-    if [ -z "$describe" ]; then
-        log_error "Failed to get git information"
-        exit 1
-    fi
-    
-    # Parse git describe output: v1.0.0-5-gabc1234-dirty
     if [[ "$describe" =~ ^(.+)-([0-9]+)-g([0-9a-f]+)(-dirty)?$ ]]; then
         VERSION="${BASH_REMATCH[1]}"
         local commits="${BASH_REMATCH[2]}"
@@ -125,228 +89,135 @@ get_version_info() {
         
         if [ "$commits" = "0" ]; then
             VERSION_FULL="$VERSION"
-            log_info "Building release: $VERSION"
         else
             VERSION_FULL="${VERSION}-${commits}-g${GIT_COMMIT}"
-            log_warn "Building from $commits commit(s) after $VERSION"
         fi
-        
-        [ -n "$dirty" ] && VERSION_FULL="${VERSION_FULL}-dirty" && log_warn "Working directory is dirty"
+        [ -n "$dirty" ] && VERSION_FULL="${VERSION_FULL}-dirty"
     else
-        # No tags found
         VERSION="0.0.0"
         GIT_COMMIT="$describe"
         VERSION_FULL="$describe"
-        log_warn "No tags found, using commit: $describe"
     fi
+    log_info "Version: $VERSION_FULL"
 }
 
-# Generate changelog
-generate_changelog() {
-    local file="build/changelog.md"
-    local prev_tag=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null)
+build_webui() {
+    log_step 2 7 "Building WebUI"
     
-    cat > "$file" << EOF
-# Changelog
+    cd webui || return 1
+    
+    # Sync version to package.json
+    if [ -f "package.json" ]; then
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" package.json
+        else
+            sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" package.json
+        fi
+    fi
 
-## Version $VERSION_FULL ($(date +%Y-%m-%d))
-
-### Changes
-
-EOF
-
-    if [ -n "$prev_tag" ]; then
-        echo "Changes since $prev_tag:" >> "$file"
-        echo "" >> "$file"
-        git log --pretty=format:"- %s (%h)" "$prev_tag"..HEAD >> "$file"
-        echo -e "\n\n---" >> "$file"
-        echo "Full Changelog: https://github.com/7a72/meta-magic_mount/compare/${prev_tag}...${VERSION}" >> "$file"
+    # Install & Build
+    if command -v pnpm &> /dev/null; then
+        pnpm install && pnpm build
     else
-        echo "Initial release" >> "$file"
-        echo "" >> "$file"
-        git log --pretty=format:"- %s (%h)" >> "$file"
+        npm install && npm run build
     fi
-}
-
-# Generate update.json for release builds
-generate_update_json() {
-    local output_name=$1
-    local version_code=$2
-    local file="build/update.json"
     
-    cat > "$file" << EOF
-{
-    "versionCode": $version_code,
-    "version": "$VERSION",
-    "zipUrl": "$BASE_URL/$VERSION/$output_name",
-    "changelog": "$CHANGELOG_URL"
-}
-EOF
+    if [ ! -d "dist" ]; then
+        log_error "WebUI build failed (dist folder missing)"
+        cd ..
+        return 1
+    fi
+    
+    cd ..
+    log_info "WebUI built successfully"
 }
 
-# Build binaries
 build_binaries() {
     local build_type=$1
-    
-    log_step 2 6 "Building binaries ($build_type)"
+    log_step 3 7 "Building binaries ($build_type)"
     
     cd src || return 1
     make clean > /dev/null 2>&1
-    
     if ! make "$build_type" VERSION="$VERSION_FULL" >&2; then
         cd ..
         log_error "Failed to build binaries"
         return 1
     fi
-    
     cd ..
-    log_info "Binaries built successfully"
 }
 
-# Configure module files
 configure_module() {
     local build_dir=$1
     local build_type=$2
     local version_code=$3
     
-    log_step 3 6 "Configuring module files"
+    log_step 4 7 "Configuring module files"
     
-    # Configure module.prop
     local module_prop="$build_dir/module.prop"
-    if [ ! -f "$module_prop" ]; then
-        log_error "module.prop not found"
-        return 1
-    fi
     
-    local module_version="$VERSION_FULL"
-    
-    sed -i "s|^version=.*|version=$module_version|" "$module_prop"
+    sed -i "s|^version=.*|version=$VERSION_FULL|" "$module_prop"
     sed -i "s|^versionCode=.*|versionCode=$version_code|" "$module_prop"
     sed -i "s|^updateJson=.*|updateJson=$UPDATE_JSON_URL|" "$module_prop"
-    
-    log_info "module.prop configured ($module_version, code $version_code)"
 }
 
-# Build single type
 build_single_type() {
     local build_type=$1
     local build_dir="build/${build_type}_temp"
     local version_code=$(git rev-list --count HEAD)
-    local output_name="meta-magic_mount-${VERSION_FULL}-${build_type}.zip"
+    local output_name="meta-hybrid-${VERSION_FULL}-${build_type}.zip"
     
-    # Register this temp directory for cleanup
     TEMP_DIRS+=("$build_dir")
     TEMP_DIRS+=("src/bin")
     
-    log_info ""
-    log_info "========================================"
-    log_info "Building $build_type version"
-    log_info "Version: $VERSION_FULL"
-    log_info "========================================"
-    
-    # Clean and create build directory
     rm -rf "$build_dir"
-    mkdir -p "$build_dir" || {
-        log_error "Failed to create build directory: $build_dir"
-        return 1
-    }
+    mkdir -p "$build_dir"
     
-    # Step 1: Copy template
-    log_step 1 6 "Copying template"
-    if ! cp -r template/* "$build_dir/"; then
-        log_error "Failed to copy template"
-        return 1
-    fi
+    # 1. Copy template
+    log_step 1 7 "Copying template"
+    cp -r template/* "$build_dir/"
     
-    # Step 2: Build binaries
+    # 2. Build WebUI (Only need to run once, but running here for simplicity)
+    
+    # 3. Build Binaries
     build_binaries "$build_type" || return 1
     
-    # Step 3: Configure module
+    # 4. Configure
     configure_module "$build_dir" "$build_type" "$version_code" || return 1
     
-    # Step 4: Copy binaries
-    log_step 4 6 "Copying binaries"
-    if [ ! -d "src/bin" ]; then
-        log_error "src/bin not found"
-        return 1
-    fi
-    if ! cp -r src/bin "$build_dir/"; then
-        log_error "Failed to copy binaries"
-        return 1
-    fi
+    # 5. Copy Binaries
+    log_step 5 7 "Copying binaries"
+    mkdir -p "$build_dir/bin"
+    cp src/bin/* "$build_dir/bin/"
     
-    # Step 5: Package
-    log_step 5 6 "Creating package"
+    # 6. Copy WebUI
+    log_step 6 7 "Copying WebUI"
+    mkdir -p "$build_dir/webroot"
+    cp -r webui/dist/* "$build_dir/webroot/"
+    
+    # 7. Package
+    log_step 7 7 "Creating package"
     if ! (cd "$build_dir" && zip -qr "../../build/$output_name" ./*); then
         log_error "Failed to create package"
         return 1
     fi
     
-    # Step 6: Generate misc for release
-    if [ "$build_type" = "release" ]; then
-        log_step 6 6 "Generating misc"
-        # Generate changelog once
-        generate_changelog
-        generate_update_json "$output_name" "$version_code"
-    else
-        log_step 6 6 "Skipping misc (debug build)"
-    fi
-    
     local size=$(du -h "build/$output_name" | cut -f1)
-    log_info ""
-    log_info "========================================="
     log_info "Build complete: $output_name ($size)"
-    log_info "========================================="
-    
-    artifact="$output_name"
 }
 
-# Main build process
 main() {
     parse_args "$@"
     check_prerequisites
     get_version_info
     
-    # Setup build directory
     mkdir -p build
     
-    # Build each type
-    local success=0
-    local failed=0
-    local built_files=()
+    # Build WebUI once for all types
+    build_webui || exit 1
     
     for build_type in "${BUILD_TYPES[@]}"; do
-        if build_single_type "$build_type"; then
-            ((success++))
-            built_files+=("$artifact")
-        else
-            ((failed++))
-            log_error "Failed to build $build_type"
-        fi
+        build_single_type "$build_type"
     done
-    
-    # Print summary
-    log_info ""
-    log_info "========================================"
-    log_info "Build Summary"
-    log_info "========================================"
-    log_info "Version: $VERSION_FULL"
-    log_info "Commit: $GIT_COMMIT"
-    log_info "Success: $success | Failed: $failed"
-    log_info "----------------------------------------"
-    log_info "Generated files:"
-    if [[ " ${BUILD_TYPES[*]} " =~ " release " ]]; then
-        log_info "  build/changelog.md"
-        log_info "  build/update.json"
-    fi
-    for file in "${built_files[@]}"; do
-        local size=$(du -h "build/$file" | cut -f1)
-        log_info "  build/$file ($size)"
-    done
-    log_info "========================================"
-    
-    [ $failed -gt 0 ] && exit 1
-    exit 0
 }
 
 main "$@"

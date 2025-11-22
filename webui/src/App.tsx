@@ -20,13 +20,13 @@ const DEFAULT_CONFIG: ConfigState = {
   moduledir: "/data/adb/modules",
   tempdir: "",
   mountsource: "KSU",
-  logfile: "/data/adb/magic_mount/mm.log",
+  logfile: "/data/adb/meta-hybrid/daemon.log",
   verbose: false,
   partitions: [],
 };
 
-const CONFIG_PATH = "/data/adb/magic_mount/mm.conf";
-const HYBRID_CONFIG_PATH = "/data/adb/magic_mount/hybrid.conf";
+const CONFIG_PATH = "/data/adb/meta-hybrid/config.conf";
+const HYBRID_CONFIG_PATH = "/data/adb/meta-hybrid/rules.conf";
 
 // --- Rule Types ---
 type RuleMode = "overlay" | "bind";

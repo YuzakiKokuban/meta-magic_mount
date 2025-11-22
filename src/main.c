@@ -14,12 +14,12 @@
 #include <strings.h>
 #include <ctype.h>
 
-#define DEFAULT_CONFIG_PATH "/data/adb/magic_mount/mm.conf"
+#define DEFAULT_CONFIG_PATH "/data/adb/meta-hybrid/config.conf"
 
 static void usage(const char *prog)
 {
     fprintf(stderr,
-            "Magic Mount Version: %s\n"
+            "Meta Hybrid Version: %s\n"
             "Usage: %s [options]\n"
             "  -m DIR     module dir (default: %s)\n"
             "  -t DIR     temp dir   (default: auto rw tmpfs + \".magic_mount\")\n"
@@ -275,21 +275,21 @@ int main(int argc, char **argv)
 
     int rc = 0;
 
-    LOGI("starting magic_mount process: module_dir=%s temp_dir=%s "
+    LOGI("starting meta-hybrid process: module_dir=%s temp_dir=%s "
          "mount_source=%s log_level=%d",
          g_module_dir, tmp_dir, g_mount_source, g_log_level);
 
     rc = magic_mount(tmp_dir);
 
     if (rc == 0) {
-        LOGI("magic_mount completed successfully");
+        LOGI("meta-hybrid completed successfully");
     } else {
-        LOGE("magic_mount failed with rc=%d "
+        LOGE("meta-hybrid failed with rc=%d "
              "(check previous logs for details)",
              rc);
     }
 
-    LOGI("magic_mount summary: modules=%d nodes_total=%d mounted=%d "
+    LOGI("meta-hybrid summary: modules=%d nodes_total=%d mounted=%d "
          "skipped=%d whiteouts=%d failures=%d",
          g_stats.modules_total, g_stats.nodes_total, g_stats.nodes_mounted,
          g_stats.nodes_skipped, g_stats.nodes_whiteout, g_stats.nodes_fail);

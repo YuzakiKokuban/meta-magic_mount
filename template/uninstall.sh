@@ -6,6 +6,6 @@
 
 MODDIR="${0%/*}"
 
-rm -rf /data/adb/magic_mount
+rm -rf /data/adb/meta-hybrid
 
 exit 0
