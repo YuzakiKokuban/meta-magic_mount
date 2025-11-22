@@ -232,7 +232,7 @@ build_single_type() {
     local build_type=$1
     local build_dir="build/${build_type}_temp"
     local version_code=$(git rev-list --count HEAD)
-    local output_name="meta-bybrid-${VERSION_FULL}-${build_type}.zip"
+    local output_name="meta-hybrid-${VERSION_FULL}-${build_type}.zip"
     
     # Register this temp directory for cleanup
     TEMP_DIRS+=("$build_dir")
