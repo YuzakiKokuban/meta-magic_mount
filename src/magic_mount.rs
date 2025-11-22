@@ -2,18 +2,22 @@ use crate::magic_mount::NodeFileType::{Directory, RegularFile, Symlink, Whiteout
 use crate::utils::{ensure_dir_exists, lgetfilecon, lsetfilecon};
 use anyhow::{Context, Result, bail};
 use extattr::lgetxattr;
-use rustix::fs::{
+use rustix::fs::{Gid, Mode, Uid, chmod, chown};
+/*use rustix::fs::{
     Gid, MetadataExt, Mode, MountFlags, MountPropagationFlags, Uid, UnmountFlags, bind_mount,
     chmod, chown, mount, move_mount, remount, unmount,
+};*/
+use rustix::mount::{
+    MountFlags, MountPropagationFlags, UnmountFlags, mount, mount_bind, mount_change, mount_move,
+    mount_remount, unmount,
 };
-use rustix::mount::mount_change;
 use rustix::path::Arg;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::fs;
 use std::fs::{DirEntry, FileType, create_dir, create_dir_all, read_dir, read_link};
-use std::os::unix::fs::{FileTypeExt, symlink};
+use std::os::unix::fs::{FileTypeExt, MetadataExt, symlink};
 use std::path::{Path, PathBuf};
 
 const DISABLE_FILE_NAME: &str = "disable";
@@ -225,7 +229,7 @@ fn mount_mirror<P: AsRef<Path>, WP: AsRef<Path>>(
             work_dir_path.display()
         );
         fs::File::create(&work_dir_path)?;
-        bind_mount(&path, &work_dir_path)?;
+        mount_bind(&path, &work_dir_path)?;
     } else if file_type.is_dir() {
         log::debug!(
             "mount mirror dir {} -> {}",
@@ -281,11 +285,13 @@ fn do_magic_mount<P: AsRef<Path>, WP: AsRef<Path>>(
                     module_path.display(),
                     work_dir_path.display()
                 );
-                bind_mount(module_path, target_path).with_context(|| {
+                mount_bind(module_path, target_path).with_context(|| {
                     format!("mount module file {module_path:?} -> {work_dir_path:?}")
                 })?;
                 // we should use MS_REMOUNT | MS_BIND | MS_xxx to change mount flags
-                if let Err(e) = remount(target_path, MountFlags::RDONLY | MountFlags::BIND, "") {
+                if let Err(e) =
+                    mount_remount(target_path, MountFlags::RDONLY | MountFlags::BIND, "")
+                {
                     log::warn!("make file {target_path:?} ro: {e:#?}");
                 }
             } else {
@@ -374,7 +380,7 @@ fn do_magic_mount<P: AsRef<Path>, WP: AsRef<Path>>(
                     path.display(),
                     work_dir_path.display()
                 );
-                bind_mount(&work_dir_path, &work_dir_path)
+                mount_bind(&work_dir_path, &work_dir_path)
                     .context("bind self")
                     .with_context(|| format!("creating tmpfs for {path:?} at {work_dir_path:?}"))?;
             }
@@ -437,10 +443,12 @@ fn do_magic_mount<P: AsRef<Path>, WP: AsRef<Path>>(
                     work_dir_path.display(),
                     path.display()
                 );
-                if let Err(e) = remount(&work_dir_path, MountFlags::RDONLY | MountFlags::BIND, "") {
+                if let Err(e) =
+                    mount_remount(&work_dir_path, MountFlags::RDONLY | MountFlags::BIND, "")
+                {
                     log::warn!("make dir {path:?} ro: {e:#?}");
                 }
-                move_mount(&work_dir_path, &path)
+                mount_move(&work_dir_path, &path)
                     .context("move self")
                     .with_context(|| format!("moving tmpfs {work_dir_path:?} -> {path:?}"))?;
                 // make private to reduce peer group count
@@ -470,7 +478,7 @@ pub fn magic_mount<T: AsRef<Path>>(
         let tmp_dir = tmp_root.join("workdir");
         ensure_dir_exists(&tmp_dir)?;
 
-        mount(mount_source, &tmp_dir, "tmpfs", MountFlags::empty(), "").context("mount tmp")?;
+        mount(mount_source, &tmp_dir, "tmpfs", MountFlags::empty(), None).context("mount tmp")?;
         mount_change(&tmp_dir, MountPropagationFlags::PRIVATE).context("make tmp private")?;
 
         let result = do_magic_mount("/", &tmp_dir, root, false);
