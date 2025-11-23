@@ -12,6 +12,7 @@ use extattr::{Flags as XattrFlags, lsetxattr};
 const SELINUX_XATTR: &str = "security.selinux";
 
 const TEMP_DIR_SUFFIX: &str = ".magic_mount";
+pub const REPLACE_DIR_FILE_NAME: &str = ".replace";
 
 const TMPFS_CANDIDATES: &[&str] = &["/mnt/vendor", "/mnt", "/debug_ramdisk"];
 

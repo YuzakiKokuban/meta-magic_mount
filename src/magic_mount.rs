@@ -21,7 +21,7 @@ use rustix::{
     path::Arg,
 };
 
-use crate::utils::{ensure_dir_exists, lgetfilecon, lsetfilecon};
+use crate::utils::{REPLACE_DIR_FILE_NAME, ensure_dir_exists, lgetfilecon, lsetfilecon};
 
 const DISABLE_FILE_NAME: &str = "disable";
 const REMOVE_FILE_NAME: &str = "remove";
@@ -146,6 +146,31 @@ impl Node {
         Ok(has_file)
     }
 
+    fn dir_is_replace<P>(path: P) -> Result<bool>
+    where
+        P: AsRef<Path>,
+    {
+        if let Ok(v) = lgetxattr(&path, REPLACE_DIR_XATTR)
+            && String::from_utf8_lossy(&v) == "y"
+        {
+            return Ok(true);
+        }
+
+        let c_path = CString::new(path.as_ref().as_str()?)?;
+        let fd = unsafe { libc::open(c_path.as_ptr(), libc::O_RDONLY | libc::O_DIRECTORY) };
+
+        if fd < 0 {
+            return Ok(false);
+        }
+
+        let exists = unsafe {
+            let replace = CString::new(REPLACE_DIR_FILE_NAME)?;
+            libc::faccessat(fd, replace.as_ptr(), libc::F_OK, 0)
+        };
+
+        if exists == 0 { Ok(true) } else { Ok(false) }
+    }
+
     fn new_root<T: ToString>(name: T) -> Self {
         Node {
             name: name.to_string(),
@@ -168,8 +193,8 @@ impl Node {
             if let Some(file_type) = file_type {
                 let mut replace = false;
                 if file_type == NodeFileType::Directory
-                    && let Ok(v) = lgetxattr(&path, REPLACE_DIR_XATTR)
-                    && String::from_utf8_lossy(&v) == "y"
+                    && let Ok(s) = Self::dir_is_replace(&path)
+                    && s
                 {
                     replace = true;
                 }
