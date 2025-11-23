@@ -776,69 +776,124 @@
 </div>
 
 <style>
-  /* 移植的 Rules 相关样式 */
   .rules-table {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-bottom: 16px;
+    gap: 12px;
+    margin-bottom: 24px;
   }
+
   .rules-header {
     display: flex;
-    gap: 8px;
+    gap: 12px;
     padding: 0 4px;
     font-size: 13px;
     font-weight: bold;
     color: var(--nord4);
+    margin-bottom: 4px;
   }
+
   .rule-row {
     display: flex;
     gap: 8px;
     align-items: center;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    transition: 0.2s;
   }
+
+  .rule-row:focus-within {
+    border-color: var(--nord8);
+    background: rgba(255, 255, 255, 0.05);
+  }
+
   .delete-btn {
-    width: 50px;
-    padding: 8px 0;
-    text-align: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: var(--nord11);
     color: #fff;
+    border-radius: 8px;
+    flex-shrink: 0;
   }
   .delete-btn:hover {
     background: #d08770;
   }
 
-  /* Modal Styles */
+  @media (max-width: 500px) {
+    .rules-header {
+      display: none;
+    }
+
+    .rule-row {
+      flex-wrap: wrap;
+      padding: 12px;
+    }
+
+    .rule-row input[type="text"] {
+      width: 100%;
+      flex: 1 1 100%;
+      order: 1;
+      margin-bottom: 4px;
+    }
+
+    .rule-row select {
+      flex: 1;
+      order: 2; 
+    }
+
+    .delete-btn {
+      order: 3;
+      width: auto;
+      padding: 0 16px;
+    }
+  }
+
   .modal-overlay { 
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
-    background: rgba(0,0,0,0.5); 
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0; 
+    background: rgba(0,0,0,0.6); 
+    backdrop-filter: blur(2px);
     display: flex; justify-content: center; align-items: center; 
-    z-index: 1000; 
+    z-index: 1000;
+    padding: 20px;
   }
   .modal { 
-    background: var(--nord1); /* 使用主题色 */
-    padding: 20px; 
-    border-radius: 8px; 
-    width: 80%; max-width: 400px; max-height: 70vh; 
+    background: var(--nord1);
+    padding: 24px; 
+    border-radius: 16px;
+    width: 100%; 
+    max-width: 400px; 
+    max-height: 80vh; 
     display: flex; flex-direction: column; 
-    box-shadow: 0 4px 10px rgba(0,0,0,0.3); 
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5); 
     color: var(--nord6);
   }
+  .modal h3 { margin-top: 0; }
+  
   .module-list-scroll { 
     overflow-y: auto; flex: 1; 
     margin-bottom: 15px; 
     border: 1px solid var(--nord2); 
-    border-radius: 4px; 
+    border-radius: 8px; 
+    background: var(--nord0);
   }
   .module-item { 
-    padding: 12px; 
+    padding: 14px; 
     border-bottom: 1px solid var(--nord2); 
     cursor: pointer; 
+    font-size: 14px;
   }
   .module-item:last-child { border-bottom: none; }
   .module-item:hover { background: var(--nord2); }
   .close-btn { 
     align-self: flex-end; 
-    padding: 8px 16px; 
-    cursor: pointer; 
+    padding: 10px 20px; 
+    background: var(--nord3);
   }
 </style>

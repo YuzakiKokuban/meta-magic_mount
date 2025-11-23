@@ -35,8 +35,7 @@ body {
   margin: 0;
   background: var(--nord0);
   color: var(--nord6);
-  font-family:
-    -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", Arial, sans-serif;
 }
 
 .app-root {
@@ -45,133 +44,69 @@ body {
   height: calc(100vh - var(--window-inset-top, 0px) - var(--window-inset-bottom, 0px));
 }
 
-/* Top bar for language selector */
 .top-bar {
-  height: 44px;
+  height: 56px; 
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
-  padding: 0 16px;
+  padding: 0 20px;
   background: var(--nord1);
   border-bottom: 1px solid var(--nord2);
+  flex-shrink: 0;
 }
 
-/* Language dropdown container */
-.lang-dropdown {
-  position: relative;
-}
-
-.lang-select {
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--nord2);
-  background: var(--nord0);
-  color: var(--nord6);
-  font-size: 13px;
-  outline: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 100px;
-  justify-content: space-between;
-  transition: 0.15s;
-}
-
-.lang-select:hover {
-  background: var(--nord2);
-}
-
-.lang-select .arrow {
-  font-size: 10px;
-  transition: transform 0.2s;
-  display: inline-block;
-}
-
-.lang-select .arrow.open {
-  transform: rotate(180deg);
-}
-
-.lang-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  background: var(--nord0);
-  border: 1px solid var(--nord2);
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  min-width: 100px;
-  z-index: 1000;
-}
-
-.lang-option {
-  width: 100%;
-  padding: 10px 16px;
-  border: none;
-  background: transparent;
-  color: var(--nord6);
-  text-align: left;
-  cursor: pointer;
-  font-size: 13px;
-  transition: 0.15s;
-  display: block;
-}
-
-.lang-option:hover {
-  background: var(--nord2);
-}
-
-.lang-option.active {
-  background: var(--nord8);
-  color: var(--nord0);
-  font-weight: 600;
-}
-
-/* Main content */
 .app-main {
   flex: 1;
-  padding: 16px 16px 64px;
+  padding: 16px;
+  padding-bottom: 80px; 
   overflow-y: auto;
-  position: relative;
+  
+  display: flex;
+  flex-direction: column;
+  align-items: center; 
 }
 
-/* ---------- Card ---------- */
 .card {
   background: var(--nord1);
   border-radius: 12px;
-  padding: 16px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  
+  width: 100%;
+  max-width: 640px; 
+  margin-bottom: 16px;
 }
 
 .card h2 {
   margin-top: 0;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   color: var(--nord6);
+  font-size: 18px;
 }
 
-/* ---------- Form fields ---------- */
 .field {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .field label {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--nord4);
+  font-weight: 500;
 }
 
 input,
 select {
-  padding: 8px 12px;
+  padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid var(--nord2);
   background: var(--nord0);
   color: var(--nord6);
-  font-size: 14px;
+  font-size: 15px; 
   outline: none;
+  width: 100%; 
 }
 
 input:focus,
@@ -180,20 +115,25 @@ select:focus {
   box-shadow: 0 0 0 2px rgba(136, 192, 208, 0.2);
 }
 
-/* ---------- Buttons ---------- */
 button {
   border: none;
   border-radius: 8px;
-  padding: 8px 16px;
+  padding: 10px 20px;
   background: var(--nord2);
   color: var(--nord6);
   cursor: pointer;
   font-size: 14px;
+  font-weight: 600;
   transition: 0.15s;
 }
 
 button:hover {
   background: var(--nord3);
+  transform: translateY(-1px);
+}
+
+button:active {
+  transform: translateY(0);
 }
 
 button.primary {
@@ -207,38 +147,18 @@ button.primary:hover {
 
 button:disabled {
   opacity: 0.5;
-  cursor: default;
+  cursor: not-allowed;
+  transform: none;
 }
 
-/* ---------- Actions (centered) ---------- */
 .actions {
   display: flex;
-  justify-content: center;
+  justify-content: flex-end; 
   gap: 12px;
-  margin-top: 16px;
-  margin-bottom: 8px;
+  margin-top: 24px;
+  flex-wrap: wrap; 
 }
 
-/* ---------- Text helpers ---------- */
-.hint {
-  font-size: 12px;
-  color: var(--nord4);
-  margin: 4px 0 8px;
-}
-
-.error {
-  font-size: 12px;
-  color: var(--nord11);
-  margin-bottom: 4px;
-}
-
-.path {
-  font-size: 11px;
-  color: var(--nord4);
-  margin-top: 4px;
-}
-
-/* ---------- Log viewer ---------- */
 .log-view {
   margin-top: 12px;
   padding: 12px;
@@ -246,79 +166,97 @@ button:disabled {
   border-radius: 8px;
   border: 1px solid var(--nord2);
   color: var(--nord6);
-  max-height: 55vh;
+  height: 400px;
+  max-height: 60vh;
   overflow-y: auto;
   font-size: 12px;
-  font-family: monospace;
-  text-align: left;
+  font-family: "JetBrains Mono", monospace;
+  white-space: pre-wrap;
 }
 
-/* ---------- Bottom Tabs ---------- */
 .bottom-bar {
   position: fixed;
   bottom: var(--window-inset-bottom, 0px);
   left: 0;
   right: 0;
-  height: 52px;
+  height: 56px;
   background: var(--nord1);
   display: flex;
   border-top: 1px solid var(--nord2);
+  z-index: 100;
+  
+  max-width: 640px;
+  margin: 0 auto; 
+}
+
+@media (min-width: 640px) {
+  .bottom-bar {
+    max-width: 100%;
+    justify-content: center;
+  }
+  .bottom-bar > button {
+    max-width: 160px;
+  }
 }
 
 .tab-btn {
   flex: 1;
   background: transparent;
   border-radius: 0;
-  color: var(--nord6);
+  color: var(--nord4);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tab-btn:hover {
+  background: var(--nord2);
+  transform: none;
 }
 
 .tab-btn.active {
-  background: var(--nord2);
+  color: var(--nord8);
+  background: rgba(136, 192, 208, 0.1);
+  font-weight: 600;
+  border-top: 2px solid var(--nord8);
 }
 
-/* ---------- loglevel Switch ---------- */
 .loglevel-switch {
   display: flex;
   width: 100%;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid var(--nord2);
   background: var(--nord0);
 }
 
 .lv-btn {
   flex: 1;
-  padding: 10px 0;
+  padding: 8px 0;
   text-align: center;
   background: var(--nord1);
-  color: var(--nord6);
+  color: var(--nord4);
   border: none;
   cursor: pointer;
   transition: 0.15s;
-  font-size: 14px;
+  font-size: 13px;
   border-radius: 0;
-}
-
-.lv-btn:first-child {
-  border-top-left-radius: 10px;
-  border-bottom-left-radius: 10px;
-}
-
-.lv-btn:last-child {
-  border-top-right-radius: 10px;
-  border-bottom-right-radius: 10px;
 }
 
 .lv-btn:hover {
   background: var(--nord2);
+  transform: none;
 }
 
 .lv-btn.active {
   background: var(--nord8);
   color: var(--nord0);
+  font-weight: 600;
 }
 
-/* ---------- Log select row ---------- */
 .log-select-row {
   display: flex;
   align-items: center;
@@ -329,120 +267,12 @@ button:disabled {
   flex: 1;
 }
 
-.refresh-btn {
-  padding: 8px 14px;
-  white-space: nowrap;
-}
-
-/* top bar title */
-.title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--nord6);
-  margin-right: auto;
-}
-
-/* module row */
-.module-list {
-  margin-top: 10px;
-}
-
-.module-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 8px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-}
-
-.module-name {
-  font-size: 15px;
-}
-
-/* switch slider */
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 44px;
-  height: 24px;
-}
-
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
+.lang-dropdown { position: relative; }
+.lang-menu {
   position: absolute;
-  cursor: pointer;
-  top: 0; left: 0;
-  right: 0; bottom: 0;
-  background-color: #666;
-  transition: 0.3s;
-  border-radius: 24px;
-}
-
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  transition: 0.3s;
-  border-radius: 50%;
-}
-
-input:checked + .slider {
-  background-color: #4caf50;
-}
-
-input:checked + .slider:before {
-  transform: translateX(20px);
-}
-
-/* disabled */
-.switch.disabled {
-  opacity: 0.4;
-  pointer-events: none;
-}
-
-/* smaller error text */
-.error.small {
-  font-size: 12px;
-  margin-left: auto;
-  color: #f66;
-}
-
-/* ---------- Tab switching overlay ---------- */
-.tab-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-  pointer-events: none;
-  background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(2px);
-}
-
-.tab-spinner {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: 3px solid rgba(255,255,255,0.25);
-  border-top-color: var(--nord8);
-  animation: tab-spin 0.6s linear infinite;
-}
-
-@keyframes tab-spin {
-  from {
-    transform: rotate(0deg) scale(0.9);
-  }
-  to {
-    transform: rotate(360deg) scale(1);
-  }
-}
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: var(--nord1);
+  border: 1px solid var(--nord2);
+  border
