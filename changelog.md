@@ -1,50 +1,16 @@
 # Changelog
 
-## Version v0.1.3 (2025-11-22)
+## Version v0.1.3a-Hybrid (2025-11-23)
 
 ### Changes
 
-Initial release
+Changes since v0.1.3:
 
-- Fix output name in build_single_type function (401dbae)
-- v0.1.3 (7b9f85c)
-- feat: add support for susfs 2.0.0 with unmount command enhancements (c890edf)
-- feat: update output name (37029a7)
-- feat: add module import functionality and update localization strings (93945ca)
-- 	modified:   build.sh (3d5d17f)
-- feat: rename path and files (42c6f0b)
-- Rename and update module properties (2567690)
-- feat: add hybrid.conf edit (da93a2f)
-- Merge branch '7a72:dev' into main (f2891c4)
-- 	modified:   src/overlayfs.c 	modified:   src/overlayfs.h (1a2b4dd)
-- fix: ci/cd (fdf7f9e)
-- bump version to 0.1.3 (adc4a0d)
-- ci/cd (02a9559)
-- Merge remote-tracking branch 'origin/main' (ca2159e)
-- Refactor: Introduce OverlayFS hybrid mount mode and restructure code (eb12daf)
-- Refactor: Introduce OverlayFS hybrid mount mode and restructure code (f698213)
-- Merge pull request #5 from backslashxx/optimize (f749c00)
-- magic_mount: dont add created files to list (245a67a)
-- compile.yml: fix build error (d38fa2b)
-- Merge pull request #4 from backslashxx/workflow (33abfed)
-- Update compile.yml (38f0a88)
-- scripts/metamount: tell ksud about it (3588ef9)
-- magic_mount: tell ksu about our mounts (ae87f30)
-- Makefile: restore pedantic (61f7ab3)
-- workflows: add simple workflow (a88cda7)
-- Makefile: some changes (dc03845)
-- scripts/metainstall: handle symlinks (a4163f0)
-- misc: Update README (53a1fdd)
-- feat: switch to c (0e8a692)
-- Merge pull request #3 from lamprose/fix-webui-conflict-statusbar (20c5006)
-- fix: webui's topbar conflicts with statusbar in some scenarios (43287ab)
-- webui: Fix safe area (f6b400c)
-- Add: Webui Support (ce59d80)
-- Revert 5b41d03592ce3daeb1e326d8b39f5143cfe88187 (ddd4a55)
-- template: fix metamodule install (ceee980)
-- scripts/metainstall: no-op handle_partition instead (a5b2ff0)
-- build.sh: add tempdir (3c9e328)
-- refactor: rewrite in C (5b41d03)
-- Add LICENSE (453aa41)
-- scripts/metainstall: call install_module (eedd9c4)
-- Initial commit (156b452)
+- feat: add back webui feature (a1e7116)
+- merge upstream (7068add)
+- misc: ci/cd dev => main [skip ci] (b0c6c11)
+- fix: #6 REPLACE and REMOVE (884bb96)
+- feat: migrate UI and add modules manager (131a819)
+
+---
+Full Changelog: https://github.com/YuzakiKokuban/meta-magic_mount/compare/v0.1.3...v0.1.3a-Hybrid
