@@ -5,6 +5,7 @@
     },
     "tabs": {
       "config": "Config",
+      "rules": "Rules",
       "modules": "Modules",
       "logs": "Logs"
     },
@@ -74,6 +75,7 @@
     },
     "tabs": {
       "config": "配置",
+      "rules": "规则",
       "modules": "模块",
       "logs": "日志"
     },
