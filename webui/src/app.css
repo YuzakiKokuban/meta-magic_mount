@@ -44,8 +44,9 @@ body {
   height: calc(100vh - var(--window-inset-top, 0px) - var(--window-inset-bottom, 0px));
 }
 
+/* Top bar */
 .top-bar {
-  height: 56px; 
+  height: 56px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -55,25 +56,25 @@ body {
   flex-shrink: 0;
 }
 
+/* Main content */
 .app-main {
   flex: 1;
   padding: 16px;
-  padding-bottom: 80px; 
+  padding-bottom: 80px;
   overflow-y: auto;
-  
   display: flex;
   flex-direction: column;
-  align-items: center; 
+  align-items: center;
 }
 
+/* ---------- Card ---------- */
 .card {
   background: var(--nord1);
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
-  
   width: 100%;
-  max-width: 640px; 
+  max-width: 640px;
   margin-bottom: 16px;
 }
 
@@ -84,6 +85,7 @@ body {
   font-size: 18px;
 }
 
+/* ---------- Form fields ---------- */
 .field {
   margin-bottom: 16px;
   display: flex;
@@ -104,9 +106,9 @@ select {
   border: 1px solid var(--nord2);
   background: var(--nord0);
   color: var(--nord6);
-  font-size: 15px; 
+  font-size: 15px;
   outline: none;
-  width: 100%; 
+  width: 100%;
 }
 
 input:focus,
@@ -115,6 +117,7 @@ select:focus {
   box-shadow: 0 0 0 2px rgba(136, 192, 208, 0.2);
 }
 
+/* ---------- Buttons ---------- */
 button {
   border: none;
   border-radius: 8px;
@@ -151,14 +154,16 @@ button:disabled {
   transform: none;
 }
 
+/* ---------- Actions ---------- */
 .actions {
   display: flex;
-  justify-content: flex-end; 
+  justify-content: flex-end;
   gap: 12px;
   margin-top: 24px;
-  flex-wrap: wrap; 
+  flex-wrap: wrap;
 }
 
+/* ---------- Log viewer ---------- */
 .log-view {
   margin-top: 12px;
   padding: 12px;
@@ -174,6 +179,7 @@ button:disabled {
   white-space: pre-wrap;
 }
 
+/* ---------- Bottom Tabs ---------- */
 .bottom-bar {
   position: fixed;
   bottom: var(--window-inset-bottom, 0px);
@@ -184,9 +190,8 @@ button:disabled {
   display: flex;
   border-top: 1px solid var(--nord2);
   z-index: 100;
-  
   max-width: 640px;
-  margin: 0 auto; 
+  margin: 0 auto;
 }
 
 @media (min-width: 640px) {
@@ -224,6 +229,7 @@ button:disabled {
   border-top: 2px solid var(--nord8);
 }
 
+/* ---------- loglevel Switch ---------- */
 .loglevel-switch {
   display: flex;
   width: 100%;
@@ -257,6 +263,7 @@ button:disabled {
   font-weight: 600;
 }
 
+/* ---------- Log select row ---------- */
 .log-select-row {
   display: flex;
   align-items: center;
@@ -267,7 +274,11 @@ button:disabled {
   flex: 1;
 }
 
-.lang-dropdown { position: relative; }
+/* ---------- Lang Dropdown ---------- */
+.lang-dropdown {
+  position: relative;
+}
+
 .lang-menu {
   position: absolute;
   top: 100%;
@@ -275,4 +286,111 @@ button:disabled {
   margin-top: 8px;
   background: var(--nord1);
   border: 1px solid var(--nord2);
-  border
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  min-width: 120px;
+  z-index: 200;
+}
+
+.lang-option {
+  width: 100%;
+  text-align: left;
+  padding: 10px 16px;
+  background: transparent;
+  border-radius: 0;
+}
+
+.lang-option:hover {
+  background: var(--nord2);
+}
+
+.lang-option.active {
+  background: var(--nord8);
+  color: var(--nord0);
+}
+
+/* ---------- Module List (Toggle) ---------- */
+.module-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--nord2);
+}
+
+.module-name {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+/* Switch Toggle */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--nord3);
+  transition: .3s;
+  border-radius: 34px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #a3be8c; /* nord14 */
+}
+
+input:checked + .slider:before {
+  transform: translateX(22px);
+}
+
+.switch.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Helpers */
+.hint {
+  font-size: 13px;
+  color: var(--nord4);
+  opacity: 0.8;
+  margin: 4px 0 12px;
+}
+
+.path {
+  font-size: 11px;
+  color: var(--nord3);
+  margin-top: 12px;
+  word-break: break-all;
+}
+
+.error {
+  color: var(--nord11);
+  font-size: 13px;
+}
