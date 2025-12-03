@@ -1,6 +1,6 @@
 {
-  "version": "0.2.82",
-  "versionCode": 2082,
-  "zipUrl": "https://github.com/Tools-cx-app/meta-magic_mount/releases/download/v0.2.82/magic_mount_rs.zip",
+  "version": "0.3.0",
+  "versionCode": 3000,
+  "zipUrl": "https://github.com/Tools-cx-app/meta-magic_mount/releases/download/v0.3.0/magic_mount_rs.zip",
   "changelog": "https://github.com/Tools-cx-app/meta-magic_mount/raw/master/update/changelog.md"
 }
