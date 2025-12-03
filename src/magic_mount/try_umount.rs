@@ -64,7 +64,7 @@ where
             log::error!("umount failed: {}", io::Error::last_os_error());
         }
 
-        log::info!("umount successful![];")
+        log::info!("umount successful!");
     };
 
     Ok(())

@@ -94,11 +94,7 @@ fn print_tree(
     };
 
     // Source path info
-    let source_str = if let Some(p) = &node.module_path {
-        format!(" -> {}", p.display())
-    } else {
-        String::new()
-    };
+    let source_str = node.module_path.as_ref().map_or_else(String::new, |p| format!(" -> {}", p.display()));
 
     // Line format: ├── name [TYPE] [FLAGS] -> /path
     writeln!(
@@ -115,7 +111,7 @@ fn print_tree(
     } else {
         "│   "
     };
-    let new_prefix = format!("{}{}", prefix, child_prefix);
+    let new_prefix = format!("{prefix}{child_prefix}");
 
     // Sort children by name for deterministic logs
     let mut children: Vec<_> = node.children.values().collect();

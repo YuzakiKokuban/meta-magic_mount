@@ -1,9 +1,5 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::Path};
 
-use anyhow::Result;
 use serde::Serialize;
 
 use crate::defs::{DISABLE_FILE_NAME, REMOVE_FILE_NAME, SKIP_MOUNT_FILE_NAME};
@@ -18,28 +14,34 @@ pub struct ModuleInfo {
     pub skip: bool,
 }
 
-fn read_prop<P: AsRef<Path>>(path: P, key: &str) -> Option<String> {
+fn read_prop<P>(path: P, key: &str) -> Option<String>
+where
+    P: AsRef<Path>,
+{
     let file = fs::read_to_string(path).ok()?;
 
     for line in file.lines() {
-        if line.starts_with(key) {
-            if let Some((_, value)) = line.split_once('=') {
-                return Some(value.trim().to_string());
-            }
+        if line.starts_with(key)
+            && let Some((_, value)) = line.split_once('=')
+        {
+            return Some(value.trim().to_string());
         }
     }
     None
 }
 
-/// Scans for modules that will be actually mounted by magic_mount.
+/// Scans for modules that will be actually mounted by `magic_mount`.
 /// Filters out modules that:
-/// 1. Do not have a 'system' directory.
+/// 1. Do not have a `system` directory.
 /// 2. Are disabled or removed.
-/// 3. Have the 'skip_mount' flag.
-pub fn scan_modules(module_dir: &PathBuf) -> Vec<ModuleInfo> {
+/// 3. Have the `skip_mount` flag.
+pub fn scan_modules<P>(module_dir: P) -> Vec<ModuleInfo>
+where
+    P: AsRef<Path>,
+{
     let mut modules = Vec::new();
 
-    if let Ok(entries) = module_dir.read_dir() {
+    if let Ok(entries) = module_dir.as_ref().read_dir() {
         for entry in entries.flatten() {
             let path = entry.path();
 
