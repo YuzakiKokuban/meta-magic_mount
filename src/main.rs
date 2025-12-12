@@ -110,7 +110,7 @@ fn main() -> Result<()> {
         MountFlags::empty(),
         None,
     ) {
-        log::warn!("do temp dir mount failed: {}", e);
+        log::warn!("do temp dir mount failed: {e}");
     }
 
     let result = magic_mount::magic_mount(

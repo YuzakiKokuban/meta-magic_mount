@@ -9,7 +9,7 @@ use extattr::{Flags as XattrFlags, lsetxattr};
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::defs::SELINUX_XATTR;
-use crate::defs::{TMPFS_CANDIDATES};
+use crate::defs::TMPFS_CANDIDATES;
 
 pub fn lsetfilecon<P>(path: P, con: &str) -> Result<()>
 where
@@ -64,12 +64,9 @@ fn is_ok_empty<P>(dir: P) -> bool
 where
     P: AsRef<Path>,
 {
-    use std::result::Result::Ok;
-
-    match dir.as_ref().read_dir() {
-        Ok(mut entries) => entries.next().is_none(),
-        Err(_) => false,
-    }
+    dir.as_ref()
+        .read_dir()
+        .is_ok_and(|mut entries| entries.next().is_none())
 }
 
 pub fn select_temp_dir() -> Result<PathBuf> {
