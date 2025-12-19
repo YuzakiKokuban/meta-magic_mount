@@ -1,6 +1,5 @@
 use std::{
     collections::{HashMap, hash_map::Entry},
-    ffi::CString,
     fmt,
     fs::{DirEntry, FileType},
     os::unix::fs::{FileTypeExt, MetadataExt},
@@ -11,7 +10,7 @@ use anyhow::Result;
 use extattr::lgetxattr;
 use rustix::path::Arg;
 
-use crate::defs::{REPLACE_DIR_FILE_NAME, REPLACE_DIR_XATTR};
+use crate::defs::REPLACE_DIR_XATTR;
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub enum NodeFileType {
@@ -118,8 +117,8 @@ impl Node {
             };
             if let Some(file_type) = file_type {
                 let replace = if file_type == NodeFileType::Directory
-                    && let Ok(s) = Self::dir_is_replace(&path)
-                    && s
+                    && let Ok(v) = lgetxattr(&path, REPLACE_DIR_XATTR)
+                    && String::from_utf8_lossy(&v) == "y"
                 {
                     true
                 } else {
