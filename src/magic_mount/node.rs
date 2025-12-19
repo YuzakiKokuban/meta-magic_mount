@@ -58,7 +58,7 @@ impl fmt::Display for NodeFileType {
 
 impl fmt::Display for Node {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "u need to send '/data/adb/' to developer ")
+        write!(f, "u need to send '/data/adb/magic_mount/tree' to developer ")
     }
 }
 

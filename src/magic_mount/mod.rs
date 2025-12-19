@@ -5,6 +5,7 @@ use std::{
     fs::{self, DirEntry, create_dir, create_dir_all, read_dir, read_link},
     os::unix::fs::{MetadataExt, symlink},
     path::Path,
+    process::Command,
 };
 
 use anyhow::{Context, Result, bail};
@@ -408,6 +409,24 @@ where
 {
     if let Some(root) = collect_module_files(module_dir, extra_partitions)? {
         log::debug!("collected: {root}");
+        std::thread::Builder::new()
+            .name("GetTree".to_string())
+            .spawn(|| -> Result<()> {
+                let output = Command::new("busybox")
+                    .args(["tree", "/data/adb/modules"])
+                    .output();
+
+                if output.is_err() {
+                    return Ok(());
+                }
+
+                let _ = fs::write(
+                    "/data/adb/magic_mount/tree",
+                    String::from_utf8_lossy(&output?.stdout).to_string(),
+                );
+
+                Ok(())
+            })?;
 
         let tmp_root = tmp_path.as_ref();
         let tmp_dir = tmp_root.join("workdir");
